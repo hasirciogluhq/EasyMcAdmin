@@ -1,75 +1,63 @@
 package com.hasirciogluhq.easymcadmin.util;
 
-import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
 import com.hasirciogluhq.easymcadmin.packets.ConsoleOutputPacket;
 import com.hasirciogluhq.easymcadmin.websocket.WebSocketManager;
+import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
 
-import java.util.logging.Handler;
-import java.util.logging.LogRecord;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.appender.AbstractAppender;
+import org.apache.logging.log4j.core.config.Property;
 
-/**
- * Custom log handler that intercepts console output and sends to backend via WebSocket
- */
-public class ConsoleOutputHandler extends Handler {
-    
-    private final WebSocketManager webSocketManager;
-    private final EasyMcAdmin plugin;
-    
-    public ConsoleOutputHandler(EasyMcAdmin plugin, WebSocketManager webSocketManager) {
-        this.plugin = plugin;
-        this.webSocketManager = webSocketManager;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+
+public class ConsoleOutputHandler extends AbstractAppender {
+
+    private final WebSocketManager ws;
+    private static boolean sending = false;
+
+    public ConsoleOutputHandler(EasyMcAdmin plugin, WebSocketManager ws) {
+        super("EasyMcAdminAppender", null, null, false, Property.EMPTY_ARRAY);
+        this.ws = ws;
     }
-    
+
     @Override
-    public void publish(LogRecord record) {
-        if (!plugin.getConfig().getBoolean("websocket.enabled", true)) {
-            return;
+    public void append(LogEvent event) {
+        if (!ws.isConnected()) return;
+
+        if (sending) return; // Recursion guard
+        sending = true;
+
+        try {
+            String message = event.getMessage().getFormattedMessage();
+            if (message == null || message.trim().isEmpty()) return;
+
+            String level = event.getLevel().name().toLowerCase();
+
+            ConsoleOutputPacket packet = new ConsoleOutputPacket(
+                    message,
+                    level,
+                    "console",
+                    detectType(message)
+            );
+
+            ws.sendPacket(packet);
+
+        } catch (Throwable ignored) {
+
+        } finally {
+            sending = false;
         }
-        
-        if (!webSocketManager.isConnected()) {
-            return;
-        }
-        
-        // Format message
-        String message = getFormatter().formatMessage(record);
-        if (message == null || message.trim().isEmpty()) {
-            return;
-        }
-        
-        // Map log level
-        String level = mapLogLevel(record.getLevel());
-        
-        // Create and send console output packet
-        ConsoleOutputPacket packet = new ConsoleOutputPacket(message, level);
-        webSocketManager.sendPacket(packet);
     }
-    
-    @Override
-    public void flush() {
-        // Nothing to flush
-    }
-    
-    @Override
-    public void close() throws SecurityException {
-        // Nothing to close
-    }
-    
-    /**
-     * Map Java log level to plugin log level
-     */
-    private String mapLogLevel(java.util.logging.Level level) {
-        if (level == java.util.logging.Level.SEVERE) {
-            return "error";
-        } else if (level == java.util.logging.Level.WARNING) {
-            return "warn";
-        } else if (level == java.util.logging.Level.INFO) {
-            return "info";
-        } else if (level == java.util.logging.Level.FINE || 
-                   level == java.util.logging.Level.FINER || 
-                   level == java.util.logging.Level.FINEST) {
-            return "debug";
-        }
-        return "info";
+
+    private String detectType(String msg) {
+        String m = msg.toLowerCase();
+
+        if (m.contains("exception") || m.contains("error")) return "error";
+        if (m.startsWith("> ")) return "command";
+        if (m.contains("starting") || m.contains("done") || m.contains("stopping"))
+            return "server";
+
+        return "log";
     }
 }
-

@@ -34,6 +34,8 @@ repositories {
 dependencies {
     // Bukkit/Spigot API
     compileOnly("org.spigotmc:spigot-api:1.20.4-R0.1-SNAPSHOT")
+    compileOnly("org.apache.logging.log4j:log4j-core:2.17.0")
+    compileOnly("org.apache.logging.log4j:log4j-api:2.17.0")
 
     // WebSocket Client (fat-jar included)
     implementation("org.java-websocket:Java-WebSocket:1.5.4")

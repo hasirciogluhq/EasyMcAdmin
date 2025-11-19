@@ -9,12 +9,12 @@ import java.util.UUID;
  */
 public class ConsoleOutputPacket extends Packet {
     
-    public ConsoleOutputPacket(String message, String level) {
+    public ConsoleOutputPacket(String message, String level, String kind, String type) {
         super(
             UUID.randomUUID().toString(), // packet_id
             PacketType.EVENT, // Always EVENT - one-way notification
             createMetadata(), // metadata
-            createPayload(message, level) // payload
+            createPayload(message, level, kind, type) // payload
         );
     }
     
@@ -25,10 +25,12 @@ public class ConsoleOutputPacket extends Packet {
         return metadata;
     }
     
-    private static JsonObject createPayload(String message, String level) {
+    private static JsonObject createPayload(String message, String level, String kind, String type) {
         JsonObject payload = new JsonObject();
         payload.addProperty("message", message);
         payload.addProperty("level", level);
+        payload.addProperty("kind", kind != null ? kind : "unknown");
+        payload.addProperty("type", type != null ? type : "log");
         return payload;
     }
     
@@ -38,6 +40,14 @@ public class ConsoleOutputPacket extends Packet {
     
     public String getLevel() {
         return payload.get("level").getAsString();
+    }
+    
+    public String getKind() {
+        return payload.has("kind") ? payload.get("kind").getAsString() : "unknown";
+    }
+    
+    public String getType() {
+        return payload.has("type") ? payload.get("type").getAsString() : "log";
     }
 }
 
