@@ -1,0 +1,35 @@
+name: ${name}
+version: ${version}
+main: com.hasirciogluhq.easymcadmin.EasyMcAdmin
+api-version: 1.20
+description: ${description}
+author: hasirciogluhq
+website: https://github.com/hasirciogluhq
+
+# Plugin load order (STARTUP, POSTWORLD)
+load: POSTWORLD
+
+# Commands
+commands:
+  easymcadmin:
+    description: Main command for Easy MC Admin
+    usage: /<command> <subcommand> [args]
+    aliases: [ema, mcadmin]
+    permission: easymcadmin.use
+    permission-message: You don't have permission to use this command.
+
+# Permissions
+permissions:
+  easymcadmin.*:
+    description: All permissions for Easy MC Admin
+    default: op
+    children:
+      easymcadmin.use: true
+      easymcadmin.admin: true
+  easymcadmin.use:
+    description: Basic usage permission
+    default: false
+  easymcadmin.admin:
+    description: Admin permissions
+    default: op
+

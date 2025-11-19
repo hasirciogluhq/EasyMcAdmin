@@ -1,0 +1,41 @@
+# Easy MC Admin Configuration
+
+# Plugin Settings
+settings:
+  # Enable/disable plugin features
+  enabled: true
+  
+  # Debug mode
+  debug: false
+
+# WebSocket Configuration
+websocket:
+  # WebSocket server URL (development: ws://localhost:8080/ws/plugin)
+  url: "ws://localhost:8080/ws/plugin"
+  
+  # Enable/disable WebSocket connection
+  enabled: true
+  
+  # Auto-reconnect on disconnect
+  auto-reconnect: true
+  
+  # Reconnect delay in seconds
+  reconnect-delay: 5
+  
+  # Connection timeout in seconds
+  timeout: 10
+
+# Server Information
+server:
+  # Server identifier (auto-generated)
+  id: ""
+  
+  # Authentication token (set via /easymcadmin setToken <token>) 
+  token: ""
+  
+  # Auto-sync server status
+  auto-sync: true
+  
+  # Sync interval in seconds
+  sync-interval: 30
+
