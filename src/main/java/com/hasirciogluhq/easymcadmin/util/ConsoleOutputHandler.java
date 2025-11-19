@@ -8,9 +8,6 @@ import org.apache.logging.log4j.core.LogEvent;
 import org.apache.logging.log4j.core.appender.AbstractAppender;
 import org.apache.logging.log4j.core.config.Property;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
-
 public class ConsoleOutputHandler extends AbstractAppender {
 
     private final WebSocketManager ws;

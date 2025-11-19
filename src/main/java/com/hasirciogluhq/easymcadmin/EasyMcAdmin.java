@@ -4,9 +4,10 @@ import com.hasirciogluhq.easymcadmin.commands.MainCommand;
 import com.hasirciogluhq.easymcadmin.packets.Packet;
 import com.hasirciogluhq.easymcadmin.util.ConsoleOutputHandler;
 import com.hasirciogluhq.easymcadmin.websocket.WebSocketManager;
+
+import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
-
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.Logger;
@@ -102,8 +103,6 @@ public class EasyMcAdmin extends JavaPlugin {
                 ? packet.getMetadata().get("action").getAsString()
                 : "";
 
-        getLogger().info("Received packet: " + action + " (type: " + packet.getPacketType() + ")");
-
         // Handle different packet types
         switch (action) {
             case "console_command":
@@ -119,9 +118,11 @@ public class EasyMcAdmin extends JavaPlugin {
                 // Send server status back
                 sendServerStatus();
                 break;
+
             default:
                 getLogger().info("Unknown packet action: " + action);
         }
+
     }
 
     /**
