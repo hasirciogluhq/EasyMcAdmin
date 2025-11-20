@@ -27,6 +27,7 @@ public class EasyMcAdmin extends JavaPlugin {
     private String serverId;
     private ConsoleOutputHandler consoleHandler;
     private MetricsScheduler metricsScheduler;
+    private com.hasirciogluhq.easymcadmin.listeners.PlayerListListener playerListListener;
 
     @Override
     public void onEnable() {
@@ -203,8 +204,9 @@ public class EasyMcAdmin extends JavaPlugin {
      * Note: Console output is handled by ConsoleOutputHandler, not event listeners
      */
     private void registerListeners() {
-        // All console output is captured by ConsoleOutputHandler
-        // No event listeners needed for console output
+        // Register player list listener
+        playerListListener = new com.hasirciogluhq.easymcadmin.listeners.PlayerListListener(this);
+        getServer().getPluginManager().registerEvents(playerListListener, this);
     }
 
     /**
@@ -240,6 +242,14 @@ public class EasyMcAdmin extends JavaPlugin {
     public void onWebSocketConnected() {
         if (metricsScheduler != null && !metricsScheduler.isRunning()) {
             metricsScheduler.start();
+        }
+        
+        // Send all offline players in chunks after connection is established
+        // Wait a bit for server to be fully ready
+        if (playerListListener != null) {
+            getServer().getScheduler().runTaskLater(this, () -> {
+                playerListListener.sendAllOfflinePlayers();
+            }, 60L); // Wait 3 seconds (60 ticks) for server to be ready
         }
     }
 }

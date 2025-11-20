@@ -2,7 +2,6 @@ package com.hasirciogluhq.easymcadmin.metrics;
 
 import com.sun.management.OperatingSystemMXBean;
 import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
 
 import java.lang.management.ManagementFactory;
 import java.util.*;
@@ -20,13 +19,9 @@ public class ServerMetricsCollector {
     public static Map<String, Object> collect() {
         Map<String, Object> data = new HashMap<>();
 
-        // Player info
+        // Player info - only count, not list
         int online = Bukkit.getOnlinePlayers().size();
         int max = Bukkit.getMaxPlayers();
-        List<String> players = new ArrayList<>();
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            players.add(player.getName());
-        }
 
         // Memory info
         long maxMemory = Runtime.getRuntime().maxMemory();
@@ -71,7 +66,6 @@ public class ServerMetricsCollector {
 
         data.put("onlinePlayers", online);
         data.put("maxPlayers", max);
-        data.put("playerList", players);
         data.put("memoryUsedMB", usedMemory / 1024 / 1024);
         data.put("memoryMaxMB", maxMemory / 1024 / 1024);
         data.put("cpuUsage", cpuLoad * 100.0);
