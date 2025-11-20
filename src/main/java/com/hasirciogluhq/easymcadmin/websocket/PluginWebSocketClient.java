@@ -62,6 +62,11 @@ public class PluginWebSocketClient extends WebSocketClient {
         authPacket.addProperty("timestamp", System.currentTimeMillis() / 1000);
         
         send(authPacket.toString());
+        
+        // Start metrics scheduler when connection is established
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            plugin.onWebSocketConnected();
+        });
     }
     
     @Override

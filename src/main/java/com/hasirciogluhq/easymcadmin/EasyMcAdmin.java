@@ -1,11 +1,11 @@
 package com.hasirciogluhq.easymcadmin;
 
 import com.hasirciogluhq.easymcadmin.commands.MainCommand;
+import com.hasirciogluhq.easymcadmin.metrics.MetricsScheduler;
 import com.hasirciogluhq.easymcadmin.packets.Packet;
 import com.hasirciogluhq.easymcadmin.util.ConsoleOutputHandler;
 import com.hasirciogluhq.easymcadmin.websocket.WebSocketManager;
 
-import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
@@ -26,6 +26,7 @@ public class EasyMcAdmin extends JavaPlugin {
     private WebSocketManager webSocketManager;
     private String serverId;
     private ConsoleOutputHandler consoleHandler;
+    private MetricsScheduler metricsScheduler;
 
     @Override
     public void onEnable() {
@@ -49,6 +50,19 @@ public class EasyMcAdmin extends JavaPlugin {
 
         // Setup packet handler for incoming packets from backend
         webSocketManager.setPacketHandler(this::handleIncomingPacket);
+
+        // Initialize metrics scheduler
+        metricsScheduler = new MetricsScheduler(this, new MetricsScheduler.WebSocketSender() {
+            @Override
+            public void sendPacket(Packet packet) {
+                webSocketManager.sendPacket(packet);
+            }
+
+            @Override
+            public boolean isConnected() {
+                return webSocketManager.isConnected();
+            }
+        });
 
         // Setup console output handler to intercept server logs
         setupConsoleHandler();
@@ -76,6 +90,11 @@ public class EasyMcAdmin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        // Stop metrics scheduler
+        if (metricsScheduler != null) {
+            metricsScheduler.stop();
+        }
+
         // Disconnect WebSocket
         if (webSocketManager != null) {
             webSocketManager.disconnect();
@@ -114,10 +133,6 @@ public class EasyMcAdmin extends JavaPlugin {
                     });
                 }
                 break;
-            case "server_status_request":
-                // Send server status back
-                sendServerStatus();
-                break;
 
             default:
                 getLogger().info("Unknown packet action: " + action);
@@ -125,52 +140,6 @@ public class EasyMcAdmin extends JavaPlugin {
 
     }
 
-    /**
-     * Send server status to backend
-     */
-    private void sendServerStatus() {
-        com.google.gson.JsonObject payload = new com.google.gson.JsonObject();
-        payload.addProperty("server_id", serverId);
-        payload.addProperty("online_players", getServer().getOnlinePlayers().size());
-        payload.addProperty("max_players", getServer().getMaxPlayers());
-        payload.addProperty("version", getServer().getVersion());
-
-        // Safely get TPS if available; otherwise, omit or use a fallback
-        double tps = -1.0;
-        try {
-            Object tpsObj = getServer().getClass().getMethod("getTPS").invoke(getServer());
-            if (tpsObj instanceof double[]) {
-                tps = ((double[]) tpsObj)[0];
-            }
-        } catch (Exception e) {
-            // Method does not exist or error occurred
-            tps = -1.0;
-        }
-        payload.addProperty("tps", tps);
-
-        com.google.gson.JsonObject metadata = new com.google.gson.JsonObject();
-        metadata.addProperty("action", "server_status");
-        metadata.addProperty("requires_response", false);
-
-        Packet statusPacket = new Packet(
-                java.util.UUID.randomUUID().toString(),
-                com.hasirciogluhq.easymcadmin.packets.PacketType.EVENT,
-                metadata,
-                payload) {
-            @Override
-            public com.google.gson.JsonObject toJson() {
-                com.google.gson.JsonObject json = new com.google.gson.JsonObject();
-                json.addProperty("packet_id", getPacketId());
-                json.addProperty("packet_type", getPacketType().name());
-                json.add("metadata", getMetadata());
-                json.add("payload", getPayload());
-                json.addProperty("timestamp", getTimestamp());
-                return json;
-            }
-        };
-
-        webSocketManager.sendPacket(statusPacket);
-    }
 
     /**
      * Setup console output handler to capture server logs
@@ -219,6 +188,11 @@ public class EasyMcAdmin extends JavaPlugin {
                         // Connect WebSocket
                         webSocketManager.connect();
                     }
+                } else {
+                    // If connected, ensure metrics scheduler is running
+                    if (metricsScheduler != null && !metricsScheduler.isRunning()) {
+                        metricsScheduler.start();
+                    }
                 }
             }
         }.runTaskTimer(this, 0L, 20L); // Every 1 second (20 ticks)
@@ -258,5 +232,14 @@ public class EasyMcAdmin extends JavaPlugin {
      */
     public String getServerId() {
         return serverId;
+    }
+
+    /**
+     * Start metrics scheduler when WebSocket connection is established
+     */
+    public void onWebSocketConnected() {
+        if (metricsScheduler != null && !metricsScheduler.isRunning()) {
+            metricsScheduler.start();
+        }
     }
 }
