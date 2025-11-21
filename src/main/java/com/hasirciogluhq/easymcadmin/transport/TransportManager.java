@@ -2,8 +2,6 @@ package com.hasirciogluhq.easymcadmin.transport;
 
 import java.io.IOException;
 
-import org.bukkit.Bukkit;
-
 import com.hasirciogluhq.easymcadmin.packets.Packet;
 
 public class TransportManager {
@@ -28,13 +26,13 @@ public class TransportManager {
     }
 
     public void sendPacket(Packet packet) throws IOException {
+        // Only allow auth packets if not authenticated
         if (!isAuthenticated() && !packet.isAuthPacket()) {
-            Bukkit.getLogger().warning("[EasyMcAdmin] Not authenticated and not an auth packet, skipping packet");
             return;
         }
 
+        // Don't allow auth packets if already authenticated
         if (isAuthenticated() && packet.isAuthPacket()) {
-            Bukkit.getLogger().warning("[EasyMcAdmin] Authenticated and is an auth packet, skipping packet");
             return;
         }
 

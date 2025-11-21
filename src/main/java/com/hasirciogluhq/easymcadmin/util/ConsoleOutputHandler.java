@@ -4,8 +4,6 @@ import com.hasirciogluhq.easymcadmin.packets.ConsoleOutputPacket;
 import com.hasirciogluhq.easymcadmin.transport.TransportManager;
 import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
 
-import java.io.IOException;
-
 import org.apache.logging.log4j.core.LogEvent;
 import org.apache.logging.log4j.core.appender.AbstractAppender;
 import org.apache.logging.log4j.core.config.Property;
@@ -22,7 +20,7 @@ public class ConsoleOutputHandler extends AbstractAppender {
 
     @Override
     public void append(LogEvent event) {
-        if (!transportManager.isConnected())
+        if (!transportManager.isConnected() || !transportManager.isAuthenticated())
             return;
 
         if (sending)

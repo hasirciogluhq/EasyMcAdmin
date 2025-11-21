@@ -75,6 +75,11 @@ public class EasyMcAdmin extends JavaPlugin {
             public boolean isConnected() {
                 return transportManager.isConnected();
             }
+
+            @Override
+            public boolean isAuthenticated() {
+                return transportManager.isAuthenticated();
+            }
         });
 
         // Setup console output handler to intercept server logs

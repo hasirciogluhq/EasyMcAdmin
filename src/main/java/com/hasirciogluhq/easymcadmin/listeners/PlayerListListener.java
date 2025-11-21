@@ -238,7 +238,7 @@ public class PlayerListListener implements Listener {
      * Action: player.join
      */
     public void sendPlayerJoin(Player player) {
-        if (!plugin.getTransportManager().isConnected()) {
+        if (!plugin.getTransportManager().isConnected() || !plugin.getTransportManager().isAuthenticated()) {
             return;
         }
 
@@ -264,7 +264,7 @@ public class PlayerListListener implements Listener {
      * Action: player.left
      */
     public void sendPlayerLeft(Player player) {
-        if (!plugin.getTransportManager().isConnected()) {
+        if (!plugin.getTransportManager().isConnected() || !plugin.getTransportManager().isAuthenticated()) {
             return;
         }
 
@@ -289,7 +289,7 @@ public class PlayerListListener implements Listener {
      *                 Action: player.inventory_update
      */
     public void sendPlayerInventoryUpdate(Player player, boolean fullSync) {
-        if (!plugin.getTransportManager().isConnected()) {
+        if (!plugin.getTransportManager().isConnected() || !plugin.getTransportManager().isAuthenticated()) {
             return;
         }
 
@@ -380,7 +380,7 @@ public class PlayerListListener implements Listener {
      * Action: player.details_update
      */
     public void sendPlayerDetailsUpdate(Player player) {
-        if (!plugin.getTransportManager().isConnected()) {
+        if (!plugin.getTransportManager().isConnected() || !plugin.getTransportManager().isAuthenticated()) {
             return;
         }
 
@@ -454,7 +454,7 @@ public class PlayerListListener implements Listener {
      * Action: player.chunk
      */
     private void sendPlayerChunk(List<OfflinePlayer> players, int chunkIndex, int totalChunks, boolean isLastChunk) {
-        if (!plugin.getTransportManager().isConnected()) {
+        if (!plugin.getTransportManager().isConnected() || !plugin.getTransportManager().isAuthenticated()) {
             return;
         }
 

@@ -24,6 +24,7 @@ public class MetricsScheduler {
     public interface TransportSender {
         void sendPacket(Packet packet);
         boolean isConnected();
+        boolean isAuthenticated();
     }
 
     /**
@@ -56,7 +57,7 @@ public class MetricsScheduler {
         task = new BukkitRunnable() {
             @Override
             public void run() {
-                if (!plugin.isEnabled() || !sender.isConnected()) {
+                if (!plugin.isEnabled() || !sender.isConnected() || !sender.isAuthenticated()) {
                     stop();
                     return;
                 }
@@ -90,7 +91,7 @@ public class MetricsScheduler {
      * Collect and send metrics packet
      */
     private void sendMetrics() {
-        if (!sender.isConnected()) {
+        if (!sender.isConnected() || !sender.isAuthenticated()) {
             return;
         }
 

@@ -68,6 +68,7 @@ public class TransportHandler implements TransportListener {
     }
 
     private void onAuthResponse(Packet packet) {
+        EasyMcAdmin.getInstance().getLogger().info("[EasyMcAdmin] Auth response received");
         GenericAuthPacketResponse authResponse = new GenericAuthPacketResponse(packet);
         if (authResponse.isSuccess()) {
             EasyMcAdmin.getInstance().setServerId(authResponse.getServerId());
@@ -81,6 +82,7 @@ public class TransportHandler implements TransportListener {
 
     private void onAuthSuccess() {
         manager.setAuthenticated(true);
+        EasyMcAdmin.getInstance().getLogger().info("[EasyMcAdmin] Transport authenticated");
         EasyMcAdmin.getInstance().onTransportConnectedAndAuthenticated();
     }
 
@@ -99,18 +101,20 @@ public class TransportHandler implements TransportListener {
     public void onConnect() {
         // Send auth packet first, onTransportConnectedAndAuthenticated will be called
         // after successful authentication in onAuthSuccess()
-        Packet authPacket = new GenericAuthPacket(EasyMcAdmin.getInstance().getConfig().getString("server.token", ""));
-        try {
-            manager.sendPacket(authPacket);
-        } catch (IOException e) {
-            EasyMcAdmin.getInstance().getLogger()
-                    .warning("[EasyMcAdmin] Error while sending auth packet: " + e.getMessage());
+        Packet authPacket = new GenericAuthPacket(
+                EasyMcAdmin.getInstance().getConfig().getString("server.token", "1234567890"));
+
+        // 2 saniye sonra gönder
+        Bukkit.getServer().getScheduler().runTaskLater(EasyMcAdmin.getInstance(), () -> {
             try {
-                manager.disconnect();
-            } catch (IOException ioException) {
-                // Ignore disconnect errors
+                manager.sendPacket(authPacket);
+                EasyMcAdmin.getInstance().getLogger().info("[EasyMcAdmin] Auth packet sent");
+            } catch (IOException e) {
+                EasyMcAdmin.getInstance().getLogger()
+                        .warning("[EasyMcAdmin] Error while sending auth packet: " + e.getMessage());
             }
-        }
+        }, 20L * 2);
+
     }
 
     @Override
