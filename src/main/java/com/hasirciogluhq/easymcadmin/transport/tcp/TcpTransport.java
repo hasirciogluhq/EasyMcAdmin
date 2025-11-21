@@ -51,7 +51,7 @@ public class TcpTransport implements TransportInterface {
             isConnected = true;
             wasConnected = true;
 
-            plugin.getLogger().info("[EasyMcAdmin] TCP connected to " + host + ":" + port);
+            plugin.getLogger().info("TCP connected to " + host + ":" + port);
 
             if (transportListener != null) {
                 transportListener.onConnect();
@@ -106,12 +106,12 @@ public class TcpTransport implements TransportInterface {
                         // Timeout - connection might still be alive, just no data
                         // TCP keep-alive will handle connection health check
                         // Continue loop instead of disconnecting
-                        plugin.getLogger().fine("[EasyMcAdmin] Read timeout (connection still alive)");
+                        plugin.getLogger().fine("Read timeout (connection still alive)");
                         continue;
                     } catch (IOException e) {
                         // Check if it's a timeout error (some implementations throw IOException for timeout)
                         if (e.getMessage() != null && e.getMessage().contains("timeout")) {
-                            plugin.getLogger().fine("[EasyMcAdmin] Read timeout (connection still alive)");
+                            plugin.getLogger().fine("Read timeout (connection still alive)");
                             continue;
                         }
                         

@@ -67,7 +67,7 @@ public class EasyMcAdmin extends JavaPlugin {
                 try {
                     transportManager.sendPacket(packet);
                 } catch (IOException e) {
-                    getLogger().warning("[EasyMcAdmin] Failed to send packet to transport: " + e.getMessage());
+                    getLogger().warning("Failed to send packet to transport: " + e.getMessage());
                 }
             }
 
@@ -94,16 +94,16 @@ public class EasyMcAdmin extends JavaPlugin {
         // Start automatic connection task (20 ticks interval)
         startConnectionTask();
 
-        getLogger().info("[EasyMcAdmin] Easy MC Admin has been enabled!");
-        getLogger().info("[EasyMcAdmin] Version: " + getDescription().getVersion());
-        getLogger().info("[EasyMcAdmin] Server ID: " + serverId);
+        getLogger().info("Easy MC Admin has been enabled!");
+        getLogger().info("Version: " + getDescription().getVersion());
+        getLogger().info("Server ID: " + serverId);
 
         // Try initial connection if token is set
         if (getConfig().getString("server.token", "").isEmpty()) {
             getLogger().warning(
-                    "[EasyMcAdmin] No token set! Use /easymcadmin setToken <token> to set authentication token.");
+                    "No token set! Use /easymcadmin setToken <token> to set authentication token.");
         } else {
-            getLogger().info("[EasyMcAdmin] Token found, attempting to connect...");
+            getLogger().info("Token found, attempting to connect...");
         }
     }
 
@@ -119,7 +119,7 @@ public class EasyMcAdmin extends JavaPlugin {
             try {
                 transportManager.disconnect();
             } catch (IOException e) {
-                getLogger().warning("[EasyMcAdmin] Failed to disconnect from transport: " + e.getMessage());
+                getLogger().warning("Failed to disconnect from transport: " + e.getMessage());
             }
         }
 
@@ -132,7 +132,7 @@ public class EasyMcAdmin extends JavaPlugin {
         } catch (Throwable ignored) {
         }
 
-        getLogger().info("[EasyMcAdmin] Easy MC Admin has been disabled!");
+        getLogger().info("Easy MC Admin has been disabled!");
     }
 
     /**
@@ -147,10 +147,10 @@ public class EasyMcAdmin extends JavaPlugin {
             Logger root = (Logger) LogManager.getRootLogger();
             root.addAppender(consoleHandler);
 
-            getLogger().info("[EasyMcAdmin] ConsoleOutputHandler (Log4j2 Appender) registered.");
+            getLogger().info("ConsoleOutputHandler (Log4j2 Appender) registered.");
 
         } catch (Exception e) {
-            getLogger().warning("[EasyMcAdmin] Failed to setup console handler: " + e.getMessage());
+            getLogger().warning("Failed to setup console handler: " + e.getMessage());
         }
     }
 
@@ -183,7 +183,7 @@ public class EasyMcAdmin extends JavaPlugin {
                         try {
                             transportManager.connect();
                         } catch (IOException e) {
-                            getLogger().warning("[EasyMcAdmin] Failed to connect to transport: " + e.getMessage());
+                            getLogger().warning("Failed to connect to transport: " + e.getMessage());
                         }
                     }
                 } else {

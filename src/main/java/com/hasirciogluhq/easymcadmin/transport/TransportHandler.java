@@ -68,33 +68,32 @@ public class TransportHandler implements TransportListener {
     }
 
     private void onAuthResponse(Packet packet) {
-        EasyMcAdmin.getInstance().getLogger().info("[EasyMcAdmin] Auth response received");
         GenericAuthPacketResponse authResponse = new GenericAuthPacketResponse(packet);
         if (authResponse.isSuccess()) {
             EasyMcAdmin.getInstance().setServerId(authResponse.getServerId());
             onAuthSuccess();
         } else {
             EasyMcAdmin.getInstance().getLogger()
-                    .warning("[EasyMcAdmin] Failed to authenticate: " + authResponse.getMessage());
+                    .warning("Failed to authenticate: " + authResponse.getMessage());
             onAuthFailure(authResponse.getMessage());
         }
     }
 
     private void onAuthSuccess() {
         manager.setAuthenticated(true);
-        EasyMcAdmin.getInstance().getLogger().info("[EasyMcAdmin] Transport authenticated");
+        EasyMcAdmin.getInstance().getLogger().info("Transport authenticated");
         EasyMcAdmin.getInstance().onTransportConnectedAndAuthenticated();
     }
 
     private void onAuthFailure(String message) {
         manager.setAuthenticated(false);
-        EasyMcAdmin.getInstance().getLogger().warning("[EasyMcAdmin] Failed to authenticate: " + message);
+        EasyMcAdmin.getInstance().getLogger().warning("Failed to authenticate: " + message);
     }
 
     @Override
     public void onDisconnect() {
         manager.setAuthenticated(false);
-        EasyMcAdmin.getInstance().getLogger().info("[EasyMcAdmin] Transport disconnected");
+        EasyMcAdmin.getInstance().getLogger().info("Transport disconnected");
     }
 
     @Override
@@ -107,10 +106,9 @@ public class TransportHandler implements TransportListener {
         Bukkit.getServer().getScheduler().runTaskLater(EasyMcAdmin.getInstance(), () -> {
             try {
                 manager.sendPacket(authPacket);
-                EasyMcAdmin.getInstance().getLogger().info("[EasyMcAdmin] Auth packet sent");
             } catch (IOException e) {
                 EasyMcAdmin.getInstance().getLogger()
-                        .warning("[EasyMcAdmin] Error while sending auth packet: " + e.getMessage());
+                        .warning("Error while sending auth packet: " + e.getMessage());
             }
         }, 6L);
 
@@ -118,7 +116,7 @@ public class TransportHandler implements TransportListener {
 
     @Override
     public void onError(Exception e) {
-        EasyMcAdmin.getInstance().getLogger().warning("[EasyMcAdmin] Transport error: " + e.getMessage());
+        EasyMcAdmin.getInstance().getLogger().warning("Transport error: " + e.getMessage());
         if (e instanceof IOException) {
             // Connection error, disconnect
             try {
