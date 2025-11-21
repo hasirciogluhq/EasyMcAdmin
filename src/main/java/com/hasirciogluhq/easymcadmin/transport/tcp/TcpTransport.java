@@ -41,7 +41,8 @@ public class TcpTransport implements TransportInterface {
     public void connect() {
         try {
             socket = new Socket();
-            socket.connect(new InetSocketAddress(host, port));
+            socket.setSoTimeout(30000); // 30 second timeout for read operations
+            socket.connect(new InetSocketAddress(host, port), 10000); // 10 second connection timeout
             dataInputStream = new DataInputStream(socket.getInputStream());
             dataOutputStream = new DataOutputStream(socket.getOutputStream());
             isConnected = true;
@@ -54,7 +55,7 @@ public class TcpTransport implements TransportInterface {
             }
 
             connectionThread = new Thread(() -> {
-                while (isConnected && !socket.isClosed()) {
+                while (isConnected && !socket.isClosed() && !Thread.currentThread().isInterrupted()) {
                     try {
                         // Read packet length (4 bytes - int)
                         int packetLength = dataInputStream.readInt();
@@ -132,12 +133,38 @@ public class TcpTransport implements TransportInterface {
     public void disconnect() {
         try {
             isConnected = false;
+            
+            // Interrupt connection thread if it's waiting
+            if (connectionThread != null && connectionThread.isAlive()) {
+                connectionThread.interrupt();
+            }
+            
+            // Close streams first
+            if (dataInputStream != null) {
+                try {
+                    dataInputStream.close();
+                } catch (IOException e) {
+                    // Ignore
+                }
+            }
+            
+            if (dataOutputStream != null) {
+                try {
+                    dataOutputStream.close();
+                } catch (IOException e) {
+                    // Ignore
+                }
+            }
+            
+            // Close socket
             if (socket != null && !socket.isClosed()) {
                 socket.close();
             }
+            
             if (wasConnected) {
                 wasConnected = false;
             }
+            
             if (transportListener != null) {
                 transportListener.onDisconnect();
             }

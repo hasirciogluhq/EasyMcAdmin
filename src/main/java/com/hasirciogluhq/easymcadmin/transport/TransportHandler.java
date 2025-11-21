@@ -91,27 +91,38 @@ public class TransportHandler implements TransportListener {
 
     @Override
     public void onDisconnect() {
-        // TODO Auto-generated method stub
-        EasyMcAdmin.getInstance().getLogger().warning("[EasyMcAdmin] Transport disconnected");
+        manager.setAuthenticated(false);
+        EasyMcAdmin.getInstance().getLogger().info("[EasyMcAdmin] Transport disconnected");
     }
 
     @Override
     public void onConnect() {
-        // send auth packet first and call main java onTransportConnected method after
-        // successful auth
+        // Send auth packet first, onTransportConnectedAndAuthenticated will be called
+        // after successful authentication in onAuthSuccess()
         Packet authPacket = new GenericAuthPacket(EasyMcAdmin.getInstance().getConfig().getString("server.token", ""));
         try {
             manager.sendPacket(authPacket);
         } catch (IOException e) {
             EasyMcAdmin.getInstance().getLogger()
                     .warning("[EasyMcAdmin] Error while sending auth packet: " + e.getMessage());
+            try {
+                manager.disconnect();
+            } catch (IOException ioException) {
+                // Ignore disconnect errors
+            }
         }
-        EasyMcAdmin.getInstance().onTransportConnectedAndAuthenticated();
     }
 
     @Override
     public void onError(Exception e) {
-        // TODO Auto-generated method stub
-        EasyMcAdmin.getInstance().getLogger().warning("[EasyMcAdmin] Error while receiving packet: " + e.getMessage());
+        EasyMcAdmin.getInstance().getLogger().warning("[EasyMcAdmin] Transport error: " + e.getMessage());
+        if (e instanceof IOException) {
+            // Connection error, disconnect
+            try {
+                manager.disconnect();
+            } catch (IOException ioException) {
+                // Ignore disconnect errors
+            }
+        }
     }
 }

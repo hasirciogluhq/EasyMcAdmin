@@ -8,12 +8,10 @@ import com.hasirciogluhq.easymcadmin.packets.Packet;
 
 public class TransportManager {
     private final TransportInterface transport;
-    private String token;
     private boolean isAuthenticated = false;
 
     public TransportManager(TransportInterface transport) {
         this.transport = transport;
-        this.token = "";
         this.isAuthenticated = false;
     }
 
@@ -40,15 +38,18 @@ public class TransportManager {
             return;
         }
 
-        transport.sendPacket(packet);
+        try {
+            transport.sendPacket(packet);
+        } catch (Exception e) {
+            if (e instanceof IOException) {
+                throw (IOException) e;
+            }
+            throw new IOException("Failed to send packet", e);
+        }
     }
 
     public void setTransportListener(TransportListener transportListener) {
         transport.setTransportListener(transportListener);
-    }
-
-    public void setToken(String token) {
-        this.token = token;
     }
 
     public boolean isAuthenticated() {

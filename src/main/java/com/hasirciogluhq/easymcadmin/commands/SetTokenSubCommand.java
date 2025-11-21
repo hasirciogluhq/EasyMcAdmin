@@ -36,7 +36,9 @@ public class SetTokenSubCommand implements SubCommand {
             }
 
             // Set token
-            plugin.getTransportManager().setToken(token);
+            // plugin.getTransportManager().setToken(token);
+            plugin.getConfig().set("server.token", token);
+            plugin.saveConfig();
 
             sender.sendMessage("[EasyMcAdmin] §aToken set successfully!");
             sender.sendMessage("[EasyMcAdmin] §7Attempting to connect...");
