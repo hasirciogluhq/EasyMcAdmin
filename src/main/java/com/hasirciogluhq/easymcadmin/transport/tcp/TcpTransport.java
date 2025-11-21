@@ -41,7 +41,9 @@ public class TcpTransport implements TransportInterface {
     public void connect() {
         try {
             socket = new Socket();
-            socket.setSoTimeout(30000); // 30 second timeout for read operations
+            socket.setSoTimeout(300000); // 5 minute timeout for read operations (long timeout)
+            socket.setKeepAlive(true); // Enable TCP keep-alive
+            socket.setTcpNoDelay(true); // Disable Nagle's algorithm for lower latency
             socket.connect(new InetSocketAddress(host, port), 10000); // 10 second connection timeout
             dataInputStream = new DataInputStream(socket.getInputStream());
             dataOutputStream = new DataOutputStream(socket.getOutputStream());
