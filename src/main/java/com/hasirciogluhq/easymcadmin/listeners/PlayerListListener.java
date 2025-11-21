@@ -6,6 +6,7 @@ import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
 import com.hasirciogluhq.easymcadmin.packets.Packet;
 import com.hasirciogluhq.easymcadmin.packets.PacketType;
 import net.milkbowl.vault.economy.Economy;
+import net.milkbowl.vault.permission.Permission;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
@@ -42,29 +43,17 @@ public class PlayerListListener implements Listener {
     private static final int CHUNK_SIZE = 20;
     private boolean initialSyncDone = false;
     private Economy economy = null;
+    private Permission permission = null;
+
+    // ============================================================================
+    // CONSTRUCTOR & SETUP
+    // ============================================================================
 
     public PlayerListListener(EasyMcAdmin plugin) {
         this.plugin = plugin;
         setupEconomy();
+        setupPermissions();
         startPlayerStateUpdateTask();
-    }
-
-    /**
-     * Start periodic task to update online players' state
-     * First sync sends full data, subsequent updates only send inventory diff if changed
-     * Updates every 5 seconds (100 ticks)
-     */
-    private void startPlayerStateUpdateTask() {
-        Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
-            if (!plugin.getWebSocketManager().isConnected()) {
-                return;
-            }
-
-            // Update all online players (will send diff if already synced)
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                sendPlayerUpdate(player, false);
-            }
-        }, 100L, 100L); // Start after 5 seconds, repeat every 5 seconds
     }
 
     /**
@@ -85,6 +74,634 @@ public class PlayerListListener implements Listener {
         economy = rsp.getProvider();
         plugin.getLogger().info("Economy plugin found: " + economy.getName());
     }
+    
+    /**
+     * Setup Vault Permissions if available
+     */
+    private void setupPermissions() {
+        if (Bukkit.getServer().getPluginManager().getPlugin("Vault") == null) {
+            plugin.getLogger().info("Vault not found, permission features will be disabled");
+            return;
+        }
+
+        RegisteredServiceProvider<Permission> rsp = Bukkit.getServer().getServicesManager().getRegistration(Permission.class);
+        if (rsp == null) {
+            plugin.getLogger().info("No permission plugin found, permission features will be disabled");
+            return;
+        }
+
+        permission = rsp.getProvider();
+        plugin.getLogger().info("Permission plugin found: " + permission.getName());
+    }
+
+    /**
+     * Start periodic task to update online players' location and details
+     * Updates every 3-5 seconds (60-100 ticks)
+     * Sends location, ping, experience - NO inventory
+     */
+    private void startPlayerStateUpdateTask() {
+        Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
+            if (!plugin.getWebSocketManager().isConnected()) {
+                return;
+            }
+
+            // Send location and details updates (no inventory)
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                sendPlayerDetailsUpdate(player);
+            }
+        }, 60L, 60L); // Start after 3 seconds, repeat every 3 seconds
+    }
+
+    // ============================================================================
+    // EVENT HANDLERS
+    // ============================================================================
+
+    @EventHandler
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        Player player = event.getPlayer();
+        sendPlayerJoin(player);
+        // Send full sync on join
+        sendPlayerInventoryUpdate(player, true);
+    }
+
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        Player player = event.getPlayer();
+        sendPlayerLeft(player);
+    }
+    
+    /**
+     * Handle inventory events - send update when inventory changes
+     */
+    @EventHandler
+    public void onInventoryClick(InventoryClickEvent event) {
+        if (event.getWhoClicked() instanceof Player) {
+            Player player = (Player) event.getWhoClicked();
+            // Send inventory update after a short delay to ensure inventory is updated
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                sendPlayerInventoryUpdate(player, false);
+            }, 1L);
+        }
+    }
+    
+    @EventHandler
+    public void onInventoryOpen(InventoryOpenEvent event) {
+        if (event.getPlayer() instanceof Player) {
+            Player player = (Player) event.getPlayer();
+            sendPlayerInventoryUpdate(player, false);
+        }
+    }
+    
+    @EventHandler
+    public void onInventoryClose(InventoryCloseEvent event) {
+        if (event.getPlayer() instanceof Player) {
+            Player player = (Player) event.getPlayer();
+            sendPlayerInventoryUpdate(player, false);
+        }
+    }
+    
+    @EventHandler
+    public void onPlayerDropItem(PlayerDropItemEvent event) {
+        Player player = event.getPlayer();
+        // Send inventory update after a short delay to ensure inventory is updated
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            sendPlayerInventoryUpdate(player, false);
+        }, 1L);
+    }
+    
+    @EventHandler
+    public void onEntityPickupItem(EntityPickupItemEvent event) {
+        if (event.getEntity() instanceof Player) {
+            Player player = (Player) event.getEntity();
+            // Send inventory update after a short delay to ensure inventory is updated
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                sendPlayerInventoryUpdate(player, false);
+            }, 1L);
+        }
+    }
+    
+    @EventHandler
+    public void onBlockPlace(BlockPlaceEvent event) {
+        Player player = event.getPlayer();
+        // Send inventory update immediately - inventory is already updated at this point
+        sendPlayerInventoryUpdate(player, false);
+    }
+    
+    @EventHandler
+    public void onPlayerItemConsume(PlayerItemConsumeEvent event) {
+        Player player = event.getPlayer();
+        // Send inventory update immediately - inventory is already updated at this point
+        sendPlayerInventoryUpdate(player, false);
+    }
+    
+    @EventHandler
+    public void onPlayerInteract(PlayerInteractEvent event) {
+        Player player = event.getPlayer();
+        // Only trigger on right-click with items (food, blocks, etc.)
+        if (event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_AIR || 
+            event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) {
+            if (event.getItem() != null) {
+                // Send inventory update immediately - inventory changes happen synchronously
+                sendPlayerInventoryUpdate(player, false);
+            }
+        }
+    }
+
+    // ============================================================================
+    // MAIN PUBLIC FUNCTIONS - Player Updates
+    // ============================================================================
+
+    /**
+     * Send player join event with full details and inventory
+     * Action: player.join
+     */
+    public void sendPlayerJoin(Player player) {
+        if (!plugin.getWebSocketManager().isConnected()) {
+            return;
+        }
+
+        try {
+            JsonObject metadata = new JsonObject();
+            metadata.addProperty("action", "player.join");
+            metadata.addProperty("requires_response", false);
+
+            JsonObject payload = new JsonObject();
+            JsonObject playerObj = getPlayerDetailsPayload(player);
+            playerObj.addProperty("online", true);
+            
+            // Add inventory, ender chest data for join events
+            addPlayerInventoryData(playerObj, player);
+
+            payload.add("player", playerObj);
+
+            Packet packet = new Packet(
+                    UUID.randomUUID().toString(),
+                    PacketType.EVENT,
+                    metadata,
+                    payload) {
+                @Override
+                public JsonObject toJson() {
+                    JsonObject json = new JsonObject();
+                    json.addProperty("packet_id", getPacketId());
+                    json.addProperty("packet_type", getPacketType().name());
+                    json.add("metadata", getMetadata());
+                    json.add("payload", getPayload());
+                    json.addProperty("timestamp", getTimestamp());
+                    return json;
+                }
+            };
+
+            plugin.getWebSocketManager().sendPacket(packet);
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to send player join event: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Send player left event with full details
+     * Action: player.left
+     */
+    public void sendPlayerLeft(Player player) {
+        if (!plugin.getWebSocketManager().isConnected()) {
+            return;
+        }
+
+        try {
+            JsonObject metadata = new JsonObject();
+            metadata.addProperty("action", "player.left");
+            metadata.addProperty("requires_response", false);
+
+            JsonObject payload = new JsonObject();
+            JsonObject playerObj = getPlayerDetailsPayload(player);
+            playerObj.addProperty("online", false);
+
+            payload.add("player", playerObj);
+
+            Packet packet = new Packet(
+                    UUID.randomUUID().toString(),
+                    PacketType.EVENT,
+                    metadata,
+                    payload) {
+                @Override
+                public JsonObject toJson() {
+                    JsonObject json = new JsonObject();
+                    json.addProperty("packet_id", getPacketId());
+                    json.addProperty("packet_type", getPacketType().name());
+                    json.add("metadata", getMetadata());
+                    json.add("payload", getPayload());
+                    json.addProperty("timestamp", getTimestamp());
+                    return json;
+                }
+            };
+
+            plugin.getWebSocketManager().sendPacket(packet);
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to send player left event: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Send player inventory update (only inventory data)
+     * @param fullSync If true, sends full inventory sync (includes ender chest), if false sends diff sync
+     * Used for inventory events (click, open, close, etc.) and full sync requests
+     * Action: player.inventory_update
+     */
+    public void sendPlayerInventoryUpdate(Player player, boolean fullSync) {
+        if (!plugin.getWebSocketManager().isConnected()) {
+            return;
+        }
+
+        UUID playerUUID = player.getUniqueId();
+        String inventoryHash = calculateInventoryHash(player.getInventory());
+        String enderChestHash = fullSync ? calculateEnderChestHash(player.getEnderChest()) : "";
+
+        try {
+            JsonObject metadata = new JsonObject();
+            metadata.addProperty("action", "player.inventory_update");
+            metadata.addProperty("requires_response", false);
+            metadata.addProperty("inventory_hash", inventoryHash);
+            if (fullSync && !enderChestHash.isEmpty()) {
+                metadata.addProperty("ender_chest_hash", enderChestHash);
+            }
+            metadata.addProperty("full_sync", fullSync);
+
+            JsonObject payload = new JsonObject();
+            JsonObject playerObj = new JsonObject();
+            playerObj.addProperty("uuid", playerUUID.toString());
+            
+            // Send inventory
+            PlayerInventory inventory = player.getInventory();
+            if (inventory != null) {
+                playerObj.add("inventory", serializeInventory(inventory));
+            }
+            
+            // Send ender chest only if full sync
+            if (fullSync) {
+                org.bukkit.inventory.Inventory enderChest = player.getEnderChest();
+                if (enderChest != null) {
+                    playerObj.add("ender_chest", serializeEnderChest(enderChest));
+                }
+            }
+
+            payload.add("player", playerObj);
+
+            Packet packet = new Packet(
+                    UUID.randomUUID().toString(),
+                    PacketType.EVENT,
+                    metadata,
+                    payload) {
+                @Override
+                public JsonObject toJson() {
+                    JsonObject json = new JsonObject();
+                    json.addProperty("packet_id", getPacketId());
+                    json.addProperty("packet_type", getPacketType().name());
+                    json.add("metadata", getMetadata());
+                    json.add("payload", getPayload());
+                    json.addProperty("timestamp", getTimestamp());
+                    return json;
+                }
+            };
+
+            plugin.getWebSocketManager().sendPacket(packet);
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to send player inventory update: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Send player details update (all player info except inventory)
+     * Used for periodic ticker updates
+     * Action: player.details_update
+     */
+    public void sendPlayerDetailsUpdate(Player player) {
+        if (!plugin.getWebSocketManager().isConnected()) {
+            return;
+        }
+
+        try {
+            JsonObject metadata = new JsonObject();
+            metadata.addProperty("action", "player.details_update");
+            metadata.addProperty("requires_response", false);
+
+            JsonObject payload = new JsonObject();
+            JsonObject playerObj = getPlayerDetailsPayload(player);
+            payload.add("player", playerObj);
+
+            Packet packet = new Packet(
+                    UUID.randomUUID().toString(),
+                    PacketType.EVENT,
+                    metadata,
+                    payload) {
+                @Override
+                public JsonObject toJson() {
+                    JsonObject json = new JsonObject();
+                    json.addProperty("packet_id", getPacketId());
+                    json.addProperty("packet_type", getPacketType().name());
+                    json.add("metadata", getMetadata());
+                    json.add("payload", getPayload());
+                    json.addProperty("timestamp", getTimestamp());
+                    return json;
+                }
+            };
+
+            plugin.getWebSocketManager().sendPacket(packet);
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to send player details update: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Send all offline players in chunks after server is ready
+     * Called when WebSocket connection is established
+     * Also sends full sync for all online players
+     */
+    public void sendAllOfflinePlayers() {
+        if (initialSyncDone || !plugin.getWebSocketManager().isConnected()) {
+            return;
+        }
+
+        initialSyncDone = true;
+
+        // First, send full sync for all online players
+        for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {
+            sendPlayerInventoryUpdate(onlinePlayer, true);
+        }
+
+        // Get all offline players (including online ones)
+        OfflinePlayer[] allPlayers = Bukkit.getOfflinePlayers();
+
+        if (allPlayers.length == 0) {
+            return;
+        }
+
+        // Send in chunks
+        List<OfflinePlayer> chunk = new ArrayList<>();
+        for (int i = 0; i < allPlayers.length; i++) {
+            chunk.add(allPlayers[i]);
+
+            if (chunk.size() >= CHUNK_SIZE || i == allPlayers.length - 1) {
+                final List<OfflinePlayer> chunkToSend = new ArrayList<>(chunk);
+                final int chunkIndex = (i / CHUNK_SIZE) + 1;
+                final int totalChunks = (allPlayers.length + CHUNK_SIZE - 1) / CHUNK_SIZE;
+                final boolean isLastChunk = (i == allPlayers.length - 1);
+
+                // Send chunk with delay to avoid overwhelming the connection
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    sendPlayerChunk(chunkToSend, chunkIndex, totalChunks, isLastChunk);
+                }, (chunkIndex - 1) * 2L); // 2 ticks delay between chunks
+
+                chunk.clear();
+            }
+        }
+    }
+    
+    /**
+     * Handle inventory sync request from backend
+     * Called when backend detects hash mismatch
+     */
+    public void handlePlayerInventorySyncRequest(UUID playerUUID) {
+        Player player = Bukkit.getPlayer(playerUUID);
+        if (player != null && player.isOnline()) {
+            sendPlayerInventoryUpdate(player, true);
+        }
+    }
+
+    /**
+     * Send a chunk of players
+     * Action: player.chunk
+     */
+    private void sendPlayerChunk(List<OfflinePlayer> players, int chunkIndex, int totalChunks, boolean isLastChunk) {
+        if (!plugin.getWebSocketManager().isConnected()) {
+            return;
+        }
+
+        try {
+            JsonObject metadata = new JsonObject();
+            metadata.addProperty("action", "player.chunk");
+            metadata.addProperty("requires_response", false);
+
+            JsonObject payload = new JsonObject();
+            payload.addProperty("chunk_index", chunkIndex);
+            payload.addProperty("total_chunks", totalChunks);
+            payload.addProperty("is_last_chunk", isLastChunk);
+
+            JsonArray playerArray = new JsonArray();
+
+            for (OfflinePlayer offlinePlayer : players) {
+                JsonObject playerObj;
+                
+                // Use common function for both online and offline players
+                if (offlinePlayer.isOnline() && offlinePlayer.getPlayer() != null) {
+                    Player player = offlinePlayer.getPlayer();
+                    playerObj = getPlayerDetailsPayload(player);
+                } else {
+                    // Offline player - use common function for offline players
+                    playerObj = getOfflinePlayerDetailsPayload(offlinePlayer);
+                }
+
+                playerArray.add(playerObj);
+            }
+            payload.add("players", playerArray);
+
+            Packet packet = new Packet(
+                    UUID.randomUUID().toString(),
+                    PacketType.EVENT,
+                    metadata,
+                    payload) {
+                @Override
+                public JsonObject toJson() {
+                    JsonObject json = new JsonObject();
+                    json.addProperty("packet_id", getPacketId());
+                    json.addProperty("packet_type", getPacketType().name());
+                    json.add("metadata", getMetadata());
+                    json.add("payload", getPayload());
+                    json.addProperty("timestamp", getTimestamp());
+                    return json;
+                }
+            };
+
+            plugin.getWebSocketManager().sendPacket(packet);
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to send player chunk: " + e.getMessage());
+        }
+    }
+
+    // ============================================================================
+    // HELPER FUNCTIONS - Player Data Payloads
+    // ============================================================================
+
+    /**
+     * Get player details payload (common function for details and chunk)
+     * Includes: username, display_name, player_list_name, ping, first_played, last_played,
+     * balance, currency, location, experience, groups
+     */
+    private JsonObject getPlayerDetailsPayload(Player player) {
+        JsonObject playerObj = new JsonObject();
+        playerObj.addProperty("uuid", player.getUniqueId().toString());
+        playerObj.addProperty("username", player.getName());
+        playerObj.addProperty("online", true);
+        playerObj.addProperty("display_name", player.getDisplayName());
+        playerObj.addProperty("player_list_name", player.getPlayerListName());
+        playerObj.addProperty("ping", player.getPing());
+        playerObj.addProperty("first_played", player.getFirstPlayed());
+        playerObj.addProperty("last_played", player.getLastPlayed());
+        
+        // Get economy balance if available
+        Double balance = getPlayerBalance(player);
+        if (balance != null) {
+            playerObj.addProperty("balance", balance);
+        }
+        String currencyName = getCurrencyName();
+        if (currencyName != null) {
+            playerObj.addProperty("currency", currencyName);
+        }
+        
+        // Send location
+        Location loc = player.getLocation();
+        if (loc != null) {
+            playerObj.add("location", serializeLocation(loc));
+        }
+        
+        // Send experience
+        JsonObject expObj = new JsonObject();
+        expObj.addProperty("level", player.getLevel());
+        expObj.addProperty("exp", player.getExp());
+        expObj.addProperty("total_exp", player.getTotalExperience());
+        playerObj.add("experience", expObj);
+        
+        // Get and send permission groups/ranks
+        String primaryGroup = getPlayerPrimaryGroup(player);
+        if (primaryGroup != null) {
+            playerObj.addProperty("primary_group", primaryGroup);
+        }
+        
+        String[] groups = getPlayerGroups(player);
+        if (groups != null && groups.length > 0) {
+            JsonArray groupsArray = new JsonArray();
+            for (String group : groups) {
+                groupsArray.add(group);
+            }
+            playerObj.add("groups", groupsArray);
+        }
+        
+        return playerObj;
+    }
+
+    /**
+     * Get offline player details payload (for offline players in chunk)
+     * Includes all fields same as online player, but with N/A for unavailable data
+     */
+    private JsonObject getOfflinePlayerDetailsPayload(OfflinePlayer offlinePlayer) {
+        JsonObject playerObj = new JsonObject();
+        playerObj.addProperty("uuid", offlinePlayer.getUniqueId().toString());
+        playerObj.addProperty("username", offlinePlayer.getName() != null ? offlinePlayer.getName() : "Unknown");
+        playerObj.addProperty("online", false);
+        
+        // Display name - N/A for offline players
+        playerObj.addProperty("display_name", "N/A");
+        
+        // Player list name - N/A for offline players
+        playerObj.addProperty("player_list_name", "N/A");
+        
+        // Ping - N/A for offline players
+        playerObj.addProperty("ping", -1);
+        
+        playerObj.addProperty("first_played", offlinePlayer.getFirstPlayed());
+        playerObj.addProperty("last_played", offlinePlayer.getLastPlayed());
+        
+        // Get economy balance if available
+        Double balance = getPlayerBalance(offlinePlayer);
+        if (balance != null) {
+            playerObj.addProperty("balance", balance);
+        } else {
+            playerObj.addProperty("balance", 0.0);
+        }
+        
+        String currencyName = getCurrencyName();
+        if (currencyName != null) {
+            playerObj.addProperty("currency", currencyName);
+        } else {
+            playerObj.addProperty("currency", "N/A");
+        }
+        
+        // Location - N/A for offline players
+        JsonObject locObj = new JsonObject();
+        locObj.addProperty("world", "N/A");
+        locObj.addProperty("x", 0.0);
+        locObj.addProperty("y", 0.0);
+        locObj.addProperty("z", 0.0);
+        locObj.addProperty("yaw", 0.0);
+        locObj.addProperty("pitch", 0.0);
+        playerObj.add("location", locObj);
+        
+        // Experience - N/A for offline players
+        JsonObject expObj = new JsonObject();
+        expObj.addProperty("level", 0);
+        expObj.addProperty("exp", 0.0);
+        expObj.addProperty("total_exp", 0);
+        playerObj.add("experience", expObj);
+        
+        // Groups - try to get from permission plugin if available
+        // For offline players, we can try to get groups from permission plugin
+        String primaryGroup = getOfflinePlayerPrimaryGroup(offlinePlayer);
+        if (primaryGroup != null) {
+            playerObj.addProperty("primary_group", primaryGroup);
+        } else {
+            playerObj.addProperty("primary_group", "N/A");
+        }
+        
+        String[] groups = getOfflinePlayerGroups(offlinePlayer);
+        if (groups != null && groups.length > 0) {
+            JsonArray groupsArray = new JsonArray();
+            for (String group : groups) {
+                groupsArray.add(group);
+            }
+            playerObj.add("groups", groupsArray);
+        } else {
+            // Empty array if no groups
+            playerObj.add("groups", new JsonArray());
+        }
+        
+        return playerObj;
+    }
+
+    /**
+     * Add player inventory, ender chest, experience, and location data to player object
+     */
+    private void addPlayerInventoryData(JsonObject playerObj, Player player) {
+        if (player == null) {
+            return;
+        }
+        
+        // Inventory
+        PlayerInventory inventory = player.getInventory();
+        if (inventory != null) {
+            playerObj.add("inventory", serializeInventory(inventory));
+        }
+        
+        // Ender Chest
+        org.bukkit.inventory.Inventory enderChest = player.getEnderChest();
+        if (enderChest != null) {
+            playerObj.add("ender_chest", serializeEnderChest(enderChest));
+        }
+        
+        // Experience
+        JsonObject expObj = new JsonObject();
+        expObj.addProperty("level", player.getLevel());
+        expObj.addProperty("exp", player.getExp());
+        expObj.addProperty("total_exp", player.getTotalExperience());
+        playerObj.add("experience", expObj);
+        
+        // Location
+        Location loc = player.getLocation();
+        if (loc != null) {
+            playerObj.add("location", serializeLocation(loc));
+        }
+    }
+
+    // ============================================================================
+    // HELPER FUNCTIONS - Vault Integration
+    // ============================================================================
 
     /**
      * Get player balance from economy plugin
@@ -123,31 +740,114 @@ public class PlayerListListener implements Listener {
     }
     
     /**
-     * Calculate hash of inventory for diff detection
+     * Get player's primary group (rank)
+     * 
+     * @param player Player to get group for
+     * @return Primary group name, or null if permission plugin is not available
      */
-    private String calculateInventoryHash(PlayerInventory inventory) {
-        if (inventory == null) {
-            return "";
+    private String getPlayerPrimaryGroup(Player player) {
+        if (permission == null || player == null) {
+            return null;
         }
         
         try {
-            JsonArray invArray = serializeInventory(inventory);
-            String inventoryJson = invArray.toString();
-            
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            byte[] hashBytes = md.digest(inventoryJson.getBytes("UTF-8"));
-            
-            StringBuilder sb = new StringBuilder();
-            for (byte b : hashBytes) {
-                sb.append(String.format("%02x", b));
-            }
-            return sb.toString();
+            String world = player.getWorld() != null ? player.getWorld().getName() : null;
+            String group = permission.getPrimaryGroup(world, player);
+            return group != null && !group.isEmpty() ? group : null;
         } catch (Exception e) {
-            plugin.getLogger().warning("Failed to calculate inventory hash: " + e.getMessage());
-            return "";
+            plugin.getLogger().warning("Failed to get primary group for player " + player.getName() + ": " + e.getMessage());
+            return null;
         }
     }
     
+    /**
+     * Get all player groups (including ranks)
+     * 
+     * @param player Player to get groups for
+     * @return Array of group names, or null if permission plugin is not available
+     */
+    private String[] getPlayerGroups(Player player) {
+        if (permission == null || player == null) {
+            return null;
+        }
+        
+        try {
+            String world = player.getWorld() != null ? player.getWorld().getName() : null;
+            String[] groups = permission.getPlayerGroups(world, player);
+            return groups != null && groups.length > 0 ? groups : null;
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to get groups for player " + player.getName() + ": " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Get offline player's primary group (rank)
+     * 
+     * @param offlinePlayer OfflinePlayer to get group for
+     * @return Primary group name, or null if permission plugin is not available
+     */
+    private String getOfflinePlayerPrimaryGroup(OfflinePlayer offlinePlayer) {
+        if (permission == null || offlinePlayer == null) {
+            return null;
+        }
+        
+        try {
+            // Try to get primary group for offline player
+            // Some permission plugins support this, some don't
+            String group = permission.getPrimaryGroup(null, offlinePlayer);
+            return group != null && !group.isEmpty() ? group : null;
+        } catch (Exception e) {
+            // Many permission plugins don't support offline player groups
+            return null;
+        }
+    }
+    
+    /**
+     * Get all offline player groups (including ranks)
+     * 
+     * @param offlinePlayer OfflinePlayer to get groups for
+     * @return Array of group names, or null if permission plugin is not available
+     */
+    private String[] getOfflinePlayerGroups(OfflinePlayer offlinePlayer) {
+        if (permission == null || offlinePlayer == null) {
+            return null;
+        }
+        
+        try {
+            // Try to get groups for offline player
+            // Some permission plugins support this, some don't
+            String[] groups = permission.getPlayerGroups(null, offlinePlayer);
+            return groups != null && groups.length > 0 ? groups : null;
+        } catch (Exception e) {
+            // Many permission plugins don't support offline player groups
+            return null;
+        }
+    }
+
+    // ============================================================================
+    // HELPER FUNCTIONS - Serialization
+    // ============================================================================
+
+    /**
+     * Serialize player location to JSON object
+     */
+    private JsonObject serializeLocation(Location loc) {
+        JsonObject locObj = new JsonObject();
+        if (loc == null) {
+            return locObj;
+        }
+        
+        locObj.addProperty("world", loc.getWorld() != null ? loc.getWorld().getName() : "unknown");
+        locObj.addProperty("x", loc.getX());
+        locObj.addProperty("y", loc.getY());
+        locObj.addProperty("z", loc.getZ());
+        locObj.addProperty("yaw", loc.getYaw());
+        locObj.addProperty("pitch", loc.getPitch());
+        
+        return locObj;
+    }
+
     /**
      * Serialize player inventory to JSON array
      * MC inventory slots:
@@ -253,431 +953,60 @@ public class PlayerListListener implements Listener {
         
         return itemObj;
     }
-    
-    /**
-     * Serialize player location to JSON object
-     */
-    private JsonObject serializeLocation(Location loc) {
-        JsonObject locObj = new JsonObject();
-        if (loc == null) {
-            return locObj;
-        }
-        
-        locObj.addProperty("world", loc.getWorld() != null ? loc.getWorld().getName() : "unknown");
-        locObj.addProperty("x", loc.getX());
-        locObj.addProperty("y", loc.getY());
-        locObj.addProperty("z", loc.getZ());
-        locObj.addProperty("yaw", loc.getYaw());
-        locObj.addProperty("pitch", loc.getPitch());
-        
-        return locObj;
-    }
-    
-    /**
-     * Add player inventory, ender chest, experience, and location data to player object
-     */
-    private void addPlayerInventoryData(JsonObject playerObj, Player player) {
-        if (player == null) {
-            return;
-        }
-        
-        // Inventory
-        PlayerInventory inventory = player.getInventory();
-        if (inventory != null) {
-            playerObj.add("inventory", serializeInventory(inventory));
-        }
-        
-        // Ender Chest
-        org.bukkit.inventory.Inventory enderChest = player.getEnderChest();
-        if (enderChest != null) {
-            playerObj.add("ender_chest", serializeEnderChest(enderChest));
-        }
-        
-        // Experience
-        JsonObject expObj = new JsonObject();
-        expObj.addProperty("level", player.getLevel());
-        expObj.addProperty("exp", player.getExp());
-        expObj.addProperty("total_exp", player.getTotalExperience());
-        playerObj.add("experience", expObj);
-        
-        // Location
-        Location loc = player.getLocation();
-        if (loc != null) {
-            playerObj.add("location", serializeLocation(loc));
-        }
-    }
+
+    // ============================================================================
+    // HELPER FUNCTIONS - Hash Calculation
+    // ============================================================================
 
     /**
-     * Send all offline players in chunks after server is ready
-     * Called when WebSocket connection is established
-     * Also sends full sync for all online players
+     * Calculate hash of inventory for diff detection
      */
-    public void sendAllOfflinePlayers() {
-        if (initialSyncDone || !plugin.getWebSocketManager().isConnected()) {
-            return;
+    private String calculateInventoryHash(PlayerInventory inventory) {
+        if (inventory == null) {
+            return "";
         }
-
-        initialSyncDone = true;
-
-        // First, send full sync for all online players
-        for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {
-            sendPlayerUpdate(onlinePlayer, true);
-        }
-
-        // Get all offline players (including online ones)
-        OfflinePlayer[] allPlayers = Bukkit.getOfflinePlayers();
-
-        if (allPlayers.length == 0) {
-            return;
-        }
-
-        // Send in chunks
-        List<OfflinePlayer> chunk = new ArrayList<>();
-        for (int i = 0; i < allPlayers.length; i++) {
-            chunk.add(allPlayers[i]);
-
-            if (chunk.size() >= CHUNK_SIZE || i == allPlayers.length - 1) {
-                final List<OfflinePlayer> chunkToSend = new ArrayList<>(chunk);
-                final int chunkIndex = (i / CHUNK_SIZE) + 1;
-                final int totalChunks = (allPlayers.length + CHUNK_SIZE - 1) / CHUNK_SIZE;
-                final boolean isLastChunk = (i == allPlayers.length - 1);
-
-                // Send chunk with delay to avoid overwhelming the connection
-                Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                    sendPlayerChunk(chunkToSend, chunkIndex, totalChunks, isLastChunk);
-                }, (chunkIndex - 1) * 2L); // 2 ticks delay between chunks
-
-                chunk.clear();
-            }
-        }
-    }
-    
-    /**
-     * Handle full sync request from backend
-     * Called when backend detects hash mismatch
-     */
-    public void handleFullSyncRequest(UUID playerUUID) {
-        Player player = Bukkit.getPlayer(playerUUID);
-        if (player != null && player.isOnline()) {
-            sendPlayerUpdate(player, true);
-        }
-    }
-
-    /**
-     * Send a chunk of players
-     */
-    private void sendPlayerChunk(List<OfflinePlayer> players, int chunkIndex, int totalChunks, boolean isLastChunk) {
-        if (!plugin.getWebSocketManager().isConnected()) {
-            return;
-        }
-
+        
         try {
-            JsonObject metadata = new JsonObject();
-            metadata.addProperty("action", "player_events");
-            metadata.addProperty("event_type", "chunk");
-            metadata.addProperty("requires_response", false);
-
-            JsonObject payload = new JsonObject();
-            payload.addProperty("chunk_index", chunkIndex);
-            payload.addProperty("total_chunks", totalChunks);
-            payload.addProperty("is_last_chunk", isLastChunk);
-
-            JsonArray playerArray = new JsonArray();
-            String currencyName = getCurrencyName();
-
-            for (OfflinePlayer offlinePlayer : players) {
-                JsonObject playerObj = new JsonObject();
-                playerObj.addProperty("uuid", offlinePlayer.getUniqueId().toString());
-                playerObj.addProperty("username",
-                        offlinePlayer.getName() != null ? offlinePlayer.getName() : "Unknown");
-                playerObj.addProperty("online", offlinePlayer.isOnline());
-                playerObj.addProperty("first_played", offlinePlayer.getFirstPlayed());
-                playerObj.addProperty("last_played", offlinePlayer.getLastPlayed());
-
-                // If online, get additional info
-                if (offlinePlayer.isOnline() && offlinePlayer.getPlayer() != null) {
-                    Player player = offlinePlayer.getPlayer();
-                    playerObj.addProperty("display_name", player.getDisplayName());
-                    playerObj.addProperty("player_list_name", player.getPlayerListName());
-                    playerObj.addProperty("ping", player.getPing());
-                }
-
-                // Get economy balance if available
-                Double balance = getPlayerBalance(offlinePlayer);
-                if (balance != null) {
-                    playerObj.addProperty("balance", balance);
-                }
-                if (currencyName != null) {
-                    playerObj.addProperty("currency", currencyName);
-                }
-
-                playerArray.add(playerObj);
-            }
-            payload.add("players", playerArray);
-
-            Packet packet = new Packet(
-                    UUID.randomUUID().toString(),
-                    PacketType.EVENT,
-                    metadata,
-                    payload) {
-                @Override
-                public JsonObject toJson() {
-                    JsonObject json = new JsonObject();
-                    json.addProperty("packet_id", getPacketId());
-                    json.addProperty("packet_type", getPacketType().name());
-                    json.add("metadata", getMetadata());
-                    json.add("payload", getPayload());
-                    json.addProperty("timestamp", getTimestamp());
-                    return json;
-                }
-            };
-
-            plugin.getWebSocketManager().sendPacket(packet);
-        } catch (Exception e) {
-            plugin.getLogger().warning("Failed to send player chunk: " + e.getMessage());
-        }
-    }
-
-    @EventHandler
-    public void onPlayerJoin(PlayerJoinEvent event) {
-        Player player = event.getPlayer();
-        sendPlayerEvent(player, "join");
-        // Send full sync on join
-        sendPlayerUpdate(player, true);
-    }
-
-    @EventHandler
-    public void onPlayerQuit(PlayerQuitEvent event) {
-        Player player = event.getPlayer();
-        sendPlayerEvent(player, "left");
-    }
-
-    /**
-     * Send player update event
-     * Plugin does NOT maintain state - always sends current inventory hash and inventory data
-     * Backend will validate hash by calculating hash(currentInventory + diff)
-     */
-    public void sendPlayerUpdate(Player player, boolean forceFullSync) {
-        if (!plugin.getWebSocketManager().isConnected()) {
-            return;
-        }
-
-        UUID playerUUID = player.getUniqueId();
-        
-        // Calculate hash of current inventory (new inventory)
-        String newInventoryHash = calculateInventoryHash(player.getInventory());
-
-        try {
-            JsonObject metadata = new JsonObject();
-            metadata.addProperty("action", "player_events");
-            metadata.addProperty("event_type", "update");
-            metadata.addProperty("requires_response", false);
-            metadata.addProperty("inventory_hash", newInventoryHash);
-            metadata.addProperty("full_sync", forceFullSync);
-
-            JsonObject payload = new JsonObject();
-            JsonObject playerObj = new JsonObject();
-            playerObj.addProperty("uuid", playerUUID.toString());
-            playerObj.addProperty("username", player.getName());
-            playerObj.addProperty("online", true);
+            JsonArray invArray = serializeInventory(inventory);
+            String inventoryJson = invArray.toString();
             
-            if (forceFullSync) {
-                // Full sync: send all player data
-                playerObj.addProperty("display_name", player.getDisplayName());
-                playerObj.addProperty("player_list_name", player.getPlayerListName());
-                playerObj.addProperty("ping", player.getPing());
-                playerObj.addProperty("first_played", player.getFirstPlayed());
-                playerObj.addProperty("last_played", player.getLastPlayed());
-
-                // Get economy balance if available
-                Double balance = getPlayerBalance(player);
-                if (balance != null) {
-                    playerObj.addProperty("balance", balance);
-                }
-                String currencyName = getCurrencyName();
-                if (currencyName != null) {
-                    playerObj.addProperty("currency", currencyName);
-                }
-                
-                // Add inventory, ender chest, experience, and location data
-                addPlayerInventoryData(playerObj, player);
-            } else {
-                // Diff sync: send only inventory (backend will apply as diff)
-                PlayerInventory inventory = player.getInventory();
-                if (inventory != null) {
-                    playerObj.add("inventory", serializeInventory(inventory));
-                }
-            }
-
-            payload.add("player", playerObj);
-
-            Packet packet = new Packet(
-                    UUID.randomUUID().toString(),
-                    PacketType.EVENT,
-                    metadata,
-                    payload) {
-                @Override
-                public JsonObject toJson() {
-                    JsonObject json = new JsonObject();
-                    json.addProperty("packet_id", getPacketId());
-                    json.addProperty("packet_type", getPacketType().name());
-                    json.add("metadata", getMetadata());
-                    json.add("payload", getPayload());
-                    json.addProperty("timestamp", getTimestamp());
-                    return json;
-                }
-            };
-
-            plugin.getWebSocketManager().sendPacket(packet);
-        } catch (Exception e) {
-            plugin.getLogger().warning("Failed to send player update: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * Overload for backward compatibility
-     */
-    public void sendPlayerUpdate(Player player) {
-        sendPlayerUpdate(player, false);
-    }
-
-    /**
-     * Send player join/left event
-     */
-    private void sendPlayerEvent(Player player, String eventType) {
-        if (!plugin.getWebSocketManager().isConnected()) {
-            return;
-        }
-
-        try {
-            JsonObject metadata = new JsonObject();
-            metadata.addProperty("action", "player_events");
-            metadata.addProperty("event_type", eventType);
-            metadata.addProperty("requires_response", false);
-
-            JsonObject payload = new JsonObject();
-            JsonObject playerObj = new JsonObject();
-            playerObj.addProperty("uuid", player.getUniqueId().toString());
-            playerObj.addProperty("username", player.getName());
-            playerObj.addProperty("online", eventType.equals("join"));
-            playerObj.addProperty("display_name", player.getDisplayName());
-            playerObj.addProperty("player_list_name", player.getPlayerListName());
-            playerObj.addProperty("ping", player.getPing());
-            playerObj.addProperty("first_played", player.getFirstPlayed());
-            playerObj.addProperty("last_played", player.getLastPlayed());
-
-            // Get economy balance if available
-            Double balance = getPlayerBalance(player);
-            if (balance != null) {
-                playerObj.addProperty("balance", balance);
-            }
-            String currencyName = getCurrencyName();
-            if (currencyName != null) {
-                playerObj.addProperty("currency", currencyName);
-            }
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] hashBytes = md.digest(inventoryJson.getBytes("UTF-8"));
             
-            // Add inventory, ender chest, experience, and location data
-            addPlayerInventoryData(playerObj, player);
-
-            payload.add("player", playerObj);
-
-            Packet packet = new Packet(
-                    UUID.randomUUID().toString(),
-                    PacketType.EVENT,
-                    metadata,
-                    payload) {
-                @Override
-                public JsonObject toJson() {
-                    JsonObject json = new JsonObject();
-                    json.addProperty("packet_id", getPacketId());
-                    json.addProperty("packet_type", getPacketType().name());
-                    json.add("metadata", getMetadata());
-                    json.add("payload", getPayload());
-                    json.addProperty("timestamp", getTimestamp());
-                    return json;
-                }
-            };
-
-            plugin.getWebSocketManager().sendPacket(packet);
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hashBytes) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
         } catch (Exception e) {
-            plugin.getLogger().warning("Failed to send player event: " + e.getMessage());
+            plugin.getLogger().warning("Failed to calculate inventory hash: " + e.getMessage());
+            return "";
         }
     }
     
     /**
-     * Handle inventory events - send update when inventory changes
+     * Calculate hash of ender chest for diff detection
      */
-    @EventHandler
-    public void onInventoryClick(InventoryClickEvent event) {
-        if (event.getWhoClicked() instanceof Player) {
-            Player player = (Player) event.getWhoClicked();
-            // Send update after a short delay to ensure inventory is updated
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                sendPlayerUpdate(player);
-            }, 1L);
+    private String calculateEnderChestHash(org.bukkit.inventory.Inventory enderChest) {
+        if (enderChest == null) {
+            return "";
         }
-    }
-    
-    @EventHandler
-    public void onInventoryOpen(InventoryOpenEvent event) {
-        if (event.getPlayer() instanceof Player) {
-            Player player = (Player) event.getPlayer();
-            sendPlayerUpdate(player);
-        }
-    }
-    
-    @EventHandler
-    public void onInventoryClose(InventoryCloseEvent event) {
-        if (event.getPlayer() instanceof Player) {
-            Player player = (Player) event.getPlayer();
-            sendPlayerUpdate(player);
-        }
-    }
-    
-    @EventHandler
-    public void onPlayerDropItem(PlayerDropItemEvent event) {
-        Player player = event.getPlayer();
-        // Send update after a short delay to ensure inventory is updated
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            sendPlayerUpdate(player);
-        }, 1L);
-    }
-    
-    @EventHandler
-    public void onEntityPickupItem(EntityPickupItemEvent event) {
-        if (event.getEntity() instanceof Player) {
-            Player player = (Player) event.getEntity();
-            // Send update after a short delay to ensure inventory is updated
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                sendPlayerUpdate(player);
-            }, 1L);
-        }
-    }
-    
-    @EventHandler
-    public void onBlockPlace(BlockPlaceEvent event) {
-        Player player = event.getPlayer();
-        // Send update immediately - inventory is already updated at this point
-        sendPlayerUpdate(player);
-    }
-    
-    @EventHandler
-    public void onPlayerItemConsume(PlayerItemConsumeEvent event) {
-        Player player = event.getPlayer();
-        // Send update immediately - inventory is already updated at this point
-        sendPlayerUpdate(player);
-    }
-    
-    @EventHandler
-    public void onPlayerInteract(PlayerInteractEvent event) {
-        Player player = event.getPlayer();
-        // Only trigger on right-click with items (food, blocks, etc.)
-        if (event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_AIR || 
-            event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) {
-            if (event.getItem() != null) {
-                // Send update immediately - inventory changes happen synchronously
-                sendPlayerUpdate(player);
+        
+        try {
+            JsonArray ecArray = serializeEnderChest(enderChest);
+            String enderChestJson = ecArray.toString();
+            
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] hashBytes = md.digest(enderChestJson.getBytes("UTF-8"));
+            
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hashBytes) {
+                sb.append(String.format("%02x", b));
             }
+            return sb.toString();
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to calculate ender chest hash: " + e.getMessage());
+            return "";
         }
     }
 }
