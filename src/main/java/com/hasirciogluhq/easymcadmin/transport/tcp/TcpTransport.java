@@ -1,0 +1,200 @@
+package com.hasirciogluhq.easymcadmin.transport.tcp;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+
+import com.google.gson.Gson;
+import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
+import com.hasirciogluhq.easymcadmin.packets.GenericPacket;
+import com.hasirciogluhq.easymcadmin.packets.Packet;
+import com.hasirciogluhq.easymcadmin.transport.TransportInterface;
+import com.hasirciogluhq.easymcadmin.transport.TransportListener;
+
+public class TcpTransport implements TransportInterface {
+    private Socket socket;
+    private String host;
+    private int port;
+    private boolean isConnected = false;
+    private boolean wasConnected = false;
+    private EasyMcAdmin plugin;
+    private Thread connectionThread;
+    private TransportListener transportListener;
+    private DataInputStream dataInputStream;
+    private DataOutputStream dataOutputStream;
+    private BlockingQueue<Packet> packetQueue;
+    private Gson gson;
+
+    public TcpTransport(EasyMcAdmin plugin, String host, int port) {
+        this.plugin = plugin;
+        this.host = host;
+        this.port = port;
+        this.packetQueue = new LinkedBlockingQueue<>();
+        this.gson = new Gson();
+    }
+
+    public void connect() {
+        try {
+            socket = new Socket();
+            socket.connect(new InetSocketAddress(host, port));
+            dataInputStream = new DataInputStream(socket.getInputStream());
+            dataOutputStream = new DataOutputStream(socket.getOutputStream());
+            isConnected = true;
+            wasConnected = true;
+
+            plugin.getLogger().info("[EasyMcAdmin] TCP connected to " + host + ":" + port);
+
+            if (transportListener != null) {
+                transportListener.onConnect();
+            }
+
+            connectionThread = new Thread(() -> {
+                while (isConnected && !socket.isClosed()) {
+                    try {
+                        // Read packet length (4 bytes - int)
+                        int packetLength = dataInputStream.readInt();
+
+                        if (packetLength <= 0 || packetLength > 10 * 1024 * 1024) { // Max 10MB
+                            isConnected = false;
+                            break;
+                        }
+
+                        // Read packet data (length bytes)
+                        byte[] packetData = new byte[packetLength];
+                        int totalRead = 0;
+                        while (totalRead < packetLength) {
+                            int bytesRead = dataInputStream.read(packetData, totalRead, packetLength - totalRead);
+                            if (bytesRead == -1) {
+                                isConnected = false;
+
+                                break;
+                            }
+                            totalRead += bytesRead;
+                        }
+
+                        if (!isConnected) {
+                            break;
+                        }
+
+                        // Convert byte array to JSON string
+                        String jsonString = new String(packetData, StandardCharsets.UTF_8);
+
+                        // Deserialize JSON to Packet
+                        try {
+                            Packet packet = new GenericPacket(jsonString);
+                            packetQueue.offer(packet);
+
+                            // Notify listener if available
+                            if (transportListener != null) {
+                                transportListener.onPacket(packet);
+                            }
+                        } catch (Exception e) {
+                            if (transportListener != null) {
+                                transportListener.onError(e);
+                            }
+                        }
+
+                    } catch (IOException e) {
+                        if (isConnected) {
+                            if (transportListener != null) {
+                                transportListener.onError(e);
+                            }
+                        }
+                        isConnected = false;
+                        break;
+                    } catch (Exception e) {
+                        if (transportListener != null) {
+                            transportListener.onError(e);
+                        }
+                        isConnected = false;
+                        break;
+                    }
+                }
+
+                onDisconnected();
+            });
+            connectionThread.setName("EasyMcAdmin-TCP-Connection");
+            connectionThread.setDaemon(true);
+            connectionThread.start();
+        } catch (IOException e) {
+            isConnected = false;
+            if (transportListener != null) {
+                transportListener.onError(e);
+            }
+        }
+    }
+
+    public void disconnect() {
+        try {
+            isConnected = false;
+            if (socket != null && !socket.isClosed()) {
+                socket.close();
+            }
+            if (wasConnected) {
+                wasConnected = false;
+            }
+            if (transportListener != null) {
+                transportListener.onDisconnect();
+            }
+        } catch (IOException e) {
+            if (transportListener != null) {
+                transportListener.onError(e);
+            }
+        }
+    }
+
+    public boolean isConnected() {
+        return isConnected && socket != null && socket.isConnected() && !socket.isClosed();
+    }
+
+    public void sendPacket(Packet packet) {
+        if (!isConnected() || dataOutputStream == null) {
+            if (transportListener != null) {
+                transportListener.onError(new IOException("Cannot send packet: not connected"));
+            }
+            return;
+        }
+
+        try {
+            // Serialize packet to JSON
+            String jsonString = gson.toJson(packet.toJson());
+            byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+            // Write packet length (4 bytes - int)
+            dataOutputStream.writeInt(jsonBytes.length);
+
+            // Write packet data
+            dataOutputStream.write(jsonBytes);
+            dataOutputStream.flush();
+
+        } catch (IOException e) {
+            isConnected = false;
+            if (transportListener != null) {
+                transportListener.onError(e);
+            }
+        } catch (Exception e) {
+            if (transportListener != null) {
+                transportListener.onError(e);
+            }
+        }
+    }
+
+    private void onDisconnected() {
+        isConnected = false;
+        if (wasConnected) {
+            wasConnected = false;
+        }
+        if (transportListener != null) {
+            transportListener.onDisconnect();
+        }
+    }
+
+    public void setTransportListener(TransportListener transportListener) {
+        this.transportListener = transportListener;
+    }
+}

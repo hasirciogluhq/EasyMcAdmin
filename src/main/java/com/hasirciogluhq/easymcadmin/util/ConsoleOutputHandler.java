@@ -1,8 +1,10 @@
 package com.hasirciogluhq.easymcadmin.util;
 
 import com.hasirciogluhq.easymcadmin.packets.ConsoleOutputPacket;
-import com.hasirciogluhq.easymcadmin.websocket.WebSocketManager;
+import com.hasirciogluhq.easymcadmin.transport.TransportManager;
 import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
+
+import java.io.IOException;
 
 import org.apache.logging.log4j.core.LogEvent;
 import org.apache.logging.log4j.core.appender.AbstractAppender;
@@ -10,24 +12,27 @@ import org.apache.logging.log4j.core.config.Property;
 
 public class ConsoleOutputHandler extends AbstractAppender {
 
-    private final WebSocketManager ws;
+    private final TransportManager transportManager;
     private static boolean sending = false;
 
-    public ConsoleOutputHandler(EasyMcAdmin plugin, WebSocketManager ws) {
+    public ConsoleOutputHandler(EasyMcAdmin plugin, TransportManager transportManager) {
         super("EasyMcAdminAppender", null, null, false, Property.EMPTY_ARRAY);
-        this.ws = ws;
+        this.transportManager = transportManager;
     }
 
     @Override
     public void append(LogEvent event) {
-        if (!ws.isConnected()) return;
+        if (!transportManager.isConnected())
+            return;
 
-        if (sending) return; // Recursion guard
+        if (sending)
+            return; // Recursion guard
         sending = true;
 
         try {
             String message = event.getMessage().getFormattedMessage();
-            if (message == null || message.trim().isEmpty()) return;
+            if (message == null || message.trim().isEmpty())
+                return;
 
             String level = event.getLevel().name().toLowerCase();
 
@@ -35,10 +40,9 @@ public class ConsoleOutputHandler extends AbstractAppender {
                     message,
                     level,
                     "console",
-                    detectType(message)
-            );
+                    detectType(message));
 
-            ws.sendPacket(packet);
+            transportManager.sendPacket(packet);
 
         } catch (Throwable ignored) {
 
@@ -50,8 +54,10 @@ public class ConsoleOutputHandler extends AbstractAppender {
     private String detectType(String msg) {
         String m = msg.toLowerCase();
 
-        if (m.contains("exception") || m.contains("error")) return "error";
-        if (m.startsWith("> ")) return "command";
+        if (m.contains("exception") || m.contains("error"))
+            return "error";
+        if (m.startsWith("> "))
+            return "command";
         if (m.contains("starting") || m.contains("done") || m.contains("stopping"))
             return "server";
 

@@ -3,8 +3,11 @@ package com.hasirciogluhq.easymcadmin;
 import com.hasirciogluhq.easymcadmin.commands.MainCommand;
 import com.hasirciogluhq.easymcadmin.metrics.MetricsScheduler;
 import com.hasirciogluhq.easymcadmin.packets.Packet;
+import com.hasirciogluhq.easymcadmin.transport.TransportHandler;
+import com.hasirciogluhq.easymcadmin.transport.TransportInterface;
+import com.hasirciogluhq.easymcadmin.transport.TransportManager;
+import com.hasirciogluhq.easymcadmin.transport.tcp.TcpTransport;
 import com.hasirciogluhq.easymcadmin.util.ConsoleOutputHandler;
-import com.hasirciogluhq.easymcadmin.websocket.WebSocketManager;
 
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -12,6 +15,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.Logger;
 
+import java.io.IOException;
 import java.util.UUID;
 
 /**
@@ -23,10 +27,11 @@ import java.util.UUID;
 public class EasyMcAdmin extends JavaPlugin {
 
     private static EasyMcAdmin instance;
-    private WebSocketManager webSocketManager;
     private String serverId;
     private ConsoleOutputHandler consoleHandler;
     private MetricsScheduler metricsScheduler;
+    private TransportManager transportManager;
+    private TransportInterface transport;
     private com.hasirciogluhq.easymcadmin.listeners.PlayerListListener playerListListener;
 
     @Override
@@ -46,22 +51,29 @@ public class EasyMcAdmin extends JavaPlugin {
             getLogger().info("Generated new server ID: " + serverId);
         }
 
-        // Initialize WebSocket Manager
-        webSocketManager = new WebSocketManager(this);
+        // Initialize Transport Manager
+        transport = new TcpTransport(this, getConfig().getString("transport.host", "localhost"),
+                getConfig().getInt("transport.port", 8798));
+
+        transportManager = new TransportManager(transport);
 
         // Setup packet handler for incoming packets from backend
-        webSocketManager.setPacketHandler(this::handleIncomingPacket);
+        transport.setTransportListener(new TransportHandler(transportManager));
 
         // Initialize metrics scheduler
-        metricsScheduler = new MetricsScheduler(this, new MetricsScheduler.WebSocketSender() {
+        metricsScheduler = new MetricsScheduler(this, new MetricsScheduler.TransportSender() {
             @Override
             public void sendPacket(Packet packet) {
-                webSocketManager.sendPacket(packet);
+                try {
+                    transportManager.sendPacket(packet);
+                } catch (IOException e) {
+                    getLogger().warning("[EasyMcAdmin] Failed to send packet to transport: " + e.getMessage());
+                }
             }
 
             @Override
             public boolean isConnected() {
-                return webSocketManager.isConnected();
+                return transportManager.isConnected();
             }
         });
 
@@ -74,18 +86,19 @@ public class EasyMcAdmin extends JavaPlugin {
         // Register event listeners
         registerListeners();
 
-        // Start automatic connection task (1 second interval)
+        // Start automatic connection task (20 ticks interval)
         startConnectionTask();
 
-        getLogger().info("Easy MC Admin has been enabled!");
-        getLogger().info("Version: " + getDescription().getVersion());
-        getLogger().info("Server ID: " + serverId);
+        getLogger().info("[EasyMcAdmin] Easy MC Admin has been enabled!");
+        getLogger().info("[EasyMcAdmin] Version: " + getDescription().getVersion());
+        getLogger().info("[EasyMcAdmin] Server ID: " + serverId);
 
         // Try initial connection if token is set
         if (getConfig().getString("server.token", "").isEmpty()) {
-            getLogger().warning("No token set! Use /easymcadmin setToken <token> to set authentication token.");
+            getLogger().warning(
+                    "[EasyMcAdmin] No token set! Use /easymcadmin setToken <token> to set authentication token.");
         } else {
-            getLogger().info("Token found, attempting to connect...");
+            getLogger().info("[EasyMcAdmin] Token found, attempting to connect...");
         }
     }
 
@@ -96,9 +109,13 @@ public class EasyMcAdmin extends JavaPlugin {
             metricsScheduler.stop();
         }
 
-        // Disconnect WebSocket
-        if (webSocketManager != null) {
-            webSocketManager.disconnect();
+        // Disconnect Transport
+        if (transportManager != null) {
+            try {
+                transportManager.disconnect();
+            } catch (IOException e) {
+                getLogger().warning("[EasyMcAdmin] Failed to disconnect from transport: " + e.getMessage());
+            }
         }
 
         // Remove console interceptor
@@ -110,53 +127,8 @@ public class EasyMcAdmin extends JavaPlugin {
         } catch (Throwable ignored) {
         }
 
-        getLogger().info("Easy MC Admin has been disabled!");
+        getLogger().info("[EasyMcAdmin] Easy MC Admin has been disabled!");
     }
-
-    /**
-     * Handle incoming packets from backend
-     * 
-     * @param packet Incoming packet
-     */
-    private void handleIncomingPacket(Packet packet) {
-        String action = packet.getMetadata().has("action")
-                ? packet.getMetadata().get("action").getAsString()
-                : "";
-
-        // Handle different packet types
-        switch (action) {
-            case "console_command":
-                // Execute command from backend
-                if (packet.getPayload().has("command")) {
-                    String command = packet.getPayload().get("command").getAsString();
-                    getServer().getScheduler().runTask(this, () -> {
-                        getServer().dispatchCommand(getServer().getConsoleSender(), command);
-                    });
-                }
-                break;
-
-            case "player.request_inventory_sync":
-                // Handle inventory sync request from backend (hash mismatch detected)
-                if (packet.getPayload().has("player_uuid")) {
-                    String playerUUIDStr = packet.getPayload().get("player_uuid").getAsString();
-                    try {
-                        UUID playerUUID = UUID.fromString(playerUUIDStr);
-                        // Use handlePlayerInventorySyncRequest method which calls sendPlayerInventoryUpdate
-                        if (playerListListener != null) {
-                            playerListListener.handlePlayerInventorySyncRequest(playerUUID);
-                        }
-                    } catch (IllegalArgumentException e) {
-                        getLogger().warning("Invalid player UUID in inventory sync request: " + playerUUIDStr);
-                    }
-                }
-                break;
-
-            default:
-                getLogger().info("Unknown packet action: " + action);
-        }
-
-    }
-
 
     /**
      * Setup console output handler to capture server logs
@@ -164,16 +136,16 @@ public class EasyMcAdmin extends JavaPlugin {
 
     private void setupConsoleHandler() {
         try {
-            consoleHandler = new ConsoleOutputHandler(this, webSocketManager);
+            consoleHandler = new ConsoleOutputHandler(this, transportManager);
             consoleHandler.start();
 
             Logger root = (Logger) LogManager.getRootLogger();
             root.addAppender(consoleHandler);
 
-            getLogger().info("ConsoleOutputHandler (Log4j2 Appender) registered.");
+            getLogger().info("[EasyMcAdmin] ConsoleOutputHandler (Log4j2 Appender) registered.");
 
         } catch (Exception e) {
-            getLogger().warning("Failed to setup console handler: " + e.getMessage());
+            getLogger().warning("[EasyMcAdmin] Failed to setup console handler: " + e.getMessage());
         }
     }
 
@@ -194,16 +166,20 @@ public class EasyMcAdmin extends JavaPlugin {
         new BukkitRunnable() {
             @Override
             public void run() {
-                if (!getConfig().getBoolean("websocket.enabled", true)) {
+                if (!getConfig().getBoolean("transport.enabled", true)) {
                     return;
                 }
 
                 // Only try to connect if not already connected
-                if (!webSocketManager.isConnected()) {
+                if (!transportManager.isConnected()) {
                     String token = getConfig().getString("server.token", "");
                     if (token != null && !token.isEmpty()) {
-                        // Connect WebSocket
-                        webSocketManager.connect();
+                        // Connect Transport
+                        try {
+                            transportManager.connect();
+                        } catch (IOException e) {
+                            getLogger().warning("[EasyMcAdmin] Failed to connect to transport: " + e.getMessage());
+                        }
                     }
                 } else {
                     // If connected, ensure metrics scheduler is running
@@ -226,6 +202,15 @@ public class EasyMcAdmin extends JavaPlugin {
     }
 
     /**
+     * Get the player list listener
+     * 
+     * @return PlayerListListener instance
+     */
+    public com.hasirciogluhq.easymcadmin.listeners.PlayerListListener getPlayerListListener() {
+        return playerListListener;
+    }
+
+    /**
      * Get the plugin instance
      * 
      * @return EasyMcAdmin instance
@@ -235,12 +220,12 @@ public class EasyMcAdmin extends JavaPlugin {
     }
 
     /**
-     * Get the WebSocket Manager
+     * Get the Transport Manager
      * 
-     * @return WebSocketManager instance
+     * @return TransportManager instance
      */
-    public WebSocketManager getWebSocketManager() {
-        return webSocketManager;
+    public TransportManager getTransportManager() {
+        return transportManager;
     }
 
     /**
@@ -253,13 +238,22 @@ public class EasyMcAdmin extends JavaPlugin {
     }
 
     /**
-     * Start metrics scheduler when WebSocket connection is established
+     * Set the server ID
+     * 
+     * @param serverId Server ID
      */
-    public void onWebSocketConnected() {
+    public void setServerId(String serverId) {
+        this.serverId = serverId;
+    }
+
+    /**
+     * Start metrics scheduler when Transport connection is established
+     */
+    public void onTransportConnectedAndAuthenticated() {
         if (metricsScheduler != null && !metricsScheduler.isRunning()) {
             metricsScheduler.start();
         }
-        
+
         // Send all offline players in chunks after connection is established
         // Wait a bit for server to be fully ready
         if (playerListListener != null) {

@@ -11,13 +11,13 @@ import com.google.gson.JsonObject;
  * - payload: Actual data
  */
 public abstract class Packet {
-    
+
     protected String packetId;
     protected PacketType packetType;
     protected JsonObject metadata;
     protected JsonObject payload;
     protected long timestamp;
-    
+
     public Packet(String packetId, PacketType packetType, JsonObject metadata, JsonObject payload) {
         this.packetId = packetId;
         this.packetType = packetType;
@@ -25,7 +25,7 @@ public abstract class Packet {
         this.payload = payload != null ? payload : new JsonObject();
         this.timestamp = System.currentTimeMillis() / 1000;
     }
-    
+
     /**
      * Convert packet to JSON
      * Server will use packet_id and metadata to determine if it's EVENT or RPC
@@ -41,7 +41,7 @@ public abstract class Packet {
         json.addProperty("timestamp", timestamp);
         return json;
     }
-    
+
     /**
      * Get packet ID
      * 
@@ -50,7 +50,7 @@ public abstract class Packet {
     public String getPacketId() {
         return packetId;
     }
-    
+
     /**
      * Get packet type (EVENT or RPC)
      * 
@@ -59,7 +59,7 @@ public abstract class Packet {
     public PacketType getPacketType() {
         return packetType;
     }
-    
+
     /**
      * Get metadata
      * 
@@ -68,7 +68,7 @@ public abstract class Packet {
     public JsonObject getMetadata() {
         return metadata;
     }
-    
+
     /**
      * Get payload
      * 
@@ -77,7 +77,7 @@ public abstract class Packet {
     public JsonObject getPayload() {
         return payload;
     }
-    
+
     /**
      * Get timestamp
      * 
@@ -86,5 +86,8 @@ public abstract class Packet {
     public long getTimestamp() {
         return timestamp;
     }
-}
 
+    public boolean isAuthPacket() {
+        return metadata.has("action") && metadata.get("action").getAsString().equals("plugin.auth.request");
+    }
+}

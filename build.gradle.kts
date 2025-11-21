@@ -43,9 +43,6 @@ dependencies {
     // Vault API (for economy support)
     compileOnly("com.github.MilkBowl:VaultAPI:1.7")
 
-    // WebSocket Client (fat-jar included)
-    implementation("org.java-websocket:Java-WebSocket:1.5.4")
-
     // JSON Serializer
     implementation("com.google.code.gson:gson:2.10.1")
 }

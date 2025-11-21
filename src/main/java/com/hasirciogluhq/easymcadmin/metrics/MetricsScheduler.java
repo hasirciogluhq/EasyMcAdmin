@@ -8,20 +8,20 @@ import org.bukkit.scheduler.BukkitRunnable;
 import java.util.Map;
 
 /**
- * Schedules and sends server metrics packets via WebSocket
+ * Schedules and sends server metrics packets via Transport
  * Sends metrics every 3 seconds (60 ticks) after initial send
  */
 public class MetricsScheduler {
 
     private final EasyMcAdmin plugin;
-    private final WebSocketSender sender;
+    private final TransportSender sender;
     private BukkitRunnable task;
     private boolean isRunning;
 
     /**
-     * Interface for sending packets via WebSocket
+     * Interface for sending packets via Transport
      */
-    public interface WebSocketSender {
+    public interface TransportSender {
         void sendPacket(Packet packet);
         boolean isConnected();
     }
@@ -30,9 +30,9 @@ public class MetricsScheduler {
      * Create a new MetricsScheduler
      * 
      * @param plugin Plugin instance
-     * @param sender WebSocket sender interface
+     * @param sender Transport sender interface
      */
-    public MetricsScheduler(EasyMcAdmin plugin, WebSocketSender sender) {
+    public MetricsScheduler(EasyMcAdmin plugin, TransportSender sender) {
         this.plugin = plugin;
         this.sender = sender;
         this.isRunning = false;

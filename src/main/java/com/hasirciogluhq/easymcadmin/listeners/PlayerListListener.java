@@ -50,7 +50,7 @@ public class PlayerListListener implements Listener {
     private boolean initialSyncDone = false;
     private Economy economy = null;
     private Permission permission = null;
-    
+
     // Store previous inventory and ender chest states for diff calculation
     private final Map<UUID, JsonArray> previousInventories = new HashMap<>();
     private final Map<UUID, JsonArray> previousEnderChests = new HashMap<>();
@@ -114,7 +114,7 @@ public class PlayerListListener implements Listener {
      */
     private void startPlayerStateUpdateTask() {
         Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
-            if (!plugin.getWebSocketManager().isConnected()) {
+            if (!plugin.getTransportManager().isConnected()) {
                 return;
             }
 
@@ -141,7 +141,7 @@ public class PlayerListListener implements Listener {
     public void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
         sendPlayerLeft(player);
-        
+
         // Clean up stored states when player quits
         UUID playerUUID = player.getUniqueId();
         previousInventories.remove(playerUUID);
@@ -238,14 +238,14 @@ public class PlayerListListener implements Listener {
      * Action: player.join
      */
     public void sendPlayerJoin(Player player) {
-        if (!plugin.getWebSocketManager().isConnected()) {
+        if (!plugin.getTransportManager().isConnected()) {
             return;
         }
 
         try {
             JsonObject playerObj = getPlayerDetailsPayload(player);
             playerObj.addProperty("online", true);
-            
+
             // Set last_played to current time when player joins
             playerObj.addProperty("last_played", System.currentTimeMillis());
 
@@ -253,7 +253,7 @@ public class PlayerListListener implements Listener {
             addPlayerInventoryData(playerObj, player);
 
             Packet packet = new PlayerJoinPacket(playerObj);
-            plugin.getWebSocketManager().sendPacket(packet);
+            plugin.getTransportManager().sendPacket(packet);
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to send player join event: " + e.getMessage());
         }
@@ -264,7 +264,7 @@ public class PlayerListListener implements Listener {
      * Action: player.left
      */
     public void sendPlayerLeft(Player player) {
-        if (!plugin.getWebSocketManager().isConnected()) {
+        if (!plugin.getTransportManager().isConnected()) {
             return;
         }
 
@@ -273,7 +273,7 @@ public class PlayerListListener implements Listener {
             playerObj.addProperty("online", false);
 
             Packet packet = new PlayerLeftPacket(playerObj);
-            plugin.getWebSocketManager().sendPacket(packet);
+            plugin.getTransportManager().sendPacket(packet);
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to send player left event: " + e.getMessage());
         }
@@ -289,26 +289,26 @@ public class PlayerListListener implements Listener {
      *                 Action: player.inventory_update
      */
     public void sendPlayerInventoryUpdate(Player player, boolean fullSync) {
-        if (!plugin.getWebSocketManager().isConnected()) {
+        if (!plugin.getTransportManager().isConnected()) {
             return;
         }
 
         UUID playerUUID = player.getUniqueId();
-        
+
         // Serialize current inventory and ender chest
         JsonArray currentInventory = null;
         JsonArray currentEnderChest = null;
-        
+
         PlayerInventory inventory = player.getInventory();
         if (inventory != null) {
             currentInventory = serializeInventory(inventory);
         }
-        
+
         org.bukkit.inventory.Inventory enderChest = player.getEnderChest();
         if (enderChest != null) {
             currentEnderChest = serializeEnderChest(enderChest);
         }
-        
+
         // Calculate hashes for both inventory and ender chest
         String inventoryHash = calculateInventoryHash(player.getInventory());
         String enderChestHash = calculateEnderChestHash(player.getEnderChest());
@@ -325,7 +325,7 @@ public class PlayerListListener implements Listener {
                 if (currentEnderChest != null) {
                     playerObj.add("ender_chest", currentEnderChest);
                 }
-                
+
                 // Update stored states
                 if (currentInventory != null) {
                     previousInventories.put(playerUUID, currentInventory);
@@ -341,24 +341,26 @@ public class PlayerListListener implements Listener {
                 JsonArray previousEnderChest = previousEnderChests.get(playerUUID);
                 String previousInventoryHash = previousInventoryHashes.get(playerUUID);
                 String previousEnderChestHash = previousEnderChestHashes.get(playerUUID);
-                
+
                 // Check if inventory hash changed
-                boolean inventoryChanged = !inventoryHash.equals(previousInventoryHash != null ? previousInventoryHash : "");
+                boolean inventoryChanged = !inventoryHash
+                        .equals(previousInventoryHash != null ? previousInventoryHash : "");
                 if (inventoryChanged && currentInventory != null) {
                     JsonArray inventoryDiff = calculateInventoryDiff(previousInventory, currentInventory);
                     playerObj.add("inventory", inventoryDiff);
-                    
+
                     // Update stored state
                     previousInventories.put(playerUUID, currentInventory);
                     previousInventoryHashes.put(playerUUID, inventoryHash);
                 }
-                
+
                 // Check if ender chest hash changed
-                boolean enderChestChanged = !enderChestHash.equals(previousEnderChestHash != null ? previousEnderChestHash : "");
+                boolean enderChestChanged = !enderChestHash
+                        .equals(previousEnderChestHash != null ? previousEnderChestHash : "");
                 if (enderChestChanged && currentEnderChest != null) {
                     JsonArray enderChestDiff = calculateEnderChestDiff(previousEnderChest, currentEnderChest);
                     playerObj.add("ender_chest", enderChestDiff);
-                    
+
                     // Update stored state
                     previousEnderChests.put(playerUUID, currentEnderChest);
                     previousEnderChestHashes.put(playerUUID, enderChestHash);
@@ -366,7 +368,7 @@ public class PlayerListListener implements Listener {
             }
 
             Packet packet = new PlayerInventoryUpdatePacket(inventoryHash, enderChestHash, fullSync, playerObj);
-            plugin.getWebSocketManager().sendPacket(packet);
+            plugin.getTransportManager().sendPacket(packet);
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to send player inventory update: " + e.getMessage());
         }
@@ -378,14 +380,14 @@ public class PlayerListListener implements Listener {
      * Action: player.details_update
      */
     public void sendPlayerDetailsUpdate(Player player) {
-        if (!plugin.getWebSocketManager().isConnected()) {
+        if (!plugin.getTransportManager().isConnected()) {
             return;
         }
 
         try {
             JsonObject playerObj = getPlayerDetailsPayload(player);
             Packet packet = new PlayerDetailsUpdatePacket(playerObj);
-            plugin.getWebSocketManager().sendPacket(packet);
+            plugin.getTransportManager().sendPacket(packet);
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to send player details update: " + e.getMessage());
         }
@@ -397,7 +399,7 @@ public class PlayerListListener implements Listener {
      * Also sends full sync for all online players
      */
     public void sendAllOfflinePlayers() {
-        if (initialSyncDone || !plugin.getWebSocketManager().isConnected()) {
+        if (initialSyncDone || !plugin.getTransportManager().isConnected()) {
             return;
         }
 
@@ -452,7 +454,7 @@ public class PlayerListListener implements Listener {
      * Action: player.chunk
      */
     private void sendPlayerChunk(List<OfflinePlayer> players, int chunkIndex, int totalChunks, boolean isLastChunk) {
-        if (!plugin.getWebSocketManager().isConnected()) {
+        if (!plugin.getTransportManager().isConnected()) {
             return;
         }
 
@@ -475,7 +477,7 @@ public class PlayerListListener implements Listener {
             }
 
             Packet packet = new PlayerChunkPacket(chunkIndex, totalChunks, isLastChunk, playerArray);
-            plugin.getWebSocketManager().sendPacket(packet);
+            plugin.getTransportManager().sendPacket(packet);
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to send player chunk: " + e.getMessage());
         }
@@ -986,17 +988,18 @@ public class PlayerListListener implements Listener {
 
     /**
      * Calculate diff between two inventory arrays (only changed slots)
-     * Returns a JsonArray with all slots, but only changed slots have actual item data
+     * Returns a JsonArray with all slots, but only changed slots have actual item
+     * data
      * Unchanged slots have empty JsonObject to maintain slot indices
      */
     private JsonArray calculateInventoryDiff(JsonArray previous, JsonArray current) {
         JsonArray diff = new JsonArray();
-        
+
         if (previous == null || previous.size() == 0) {
             // No previous state, return full inventory
             return current != null ? current : new JsonArray();
         }
-        
+
         if (current == null || current.size() == 0) {
             // Current is empty, return array with empty items for all previous slots
             for (int i = 0; i < previous.size(); i++) {
@@ -1007,17 +1010,19 @@ public class PlayerListListener implements Listener {
             }
             return diff;
         }
-        
+
         // Find the maximum size
         int maxSize = Math.max(previous.size(), current.size());
-        
+
         // Compare each slot
         for (int i = 0; i < maxSize; i++) {
-            JsonObject prevItem = i < previous.size() && !previous.get(i).isJsonNull() 
-                ? previous.get(i).getAsJsonObject() : null;
-            JsonObject currItem = i < current.size() && !current.get(i).isJsonNull() 
-                ? current.get(i).getAsJsonObject() : null;
-            
+            JsonObject prevItem = i < previous.size() && !previous.get(i).isJsonNull()
+                    ? previous.get(i).getAsJsonObject()
+                    : null;
+            JsonObject currItem = i < current.size() && !current.get(i).isJsonNull()
+                    ? current.get(i).getAsJsonObject()
+                    : null;
+
             // Check if slot changed
             boolean changed = false;
             if (prevItem == null && currItem == null) {
@@ -1033,15 +1038,17 @@ public class PlayerListListener implements Listener {
                 String currType = currItem.has("type") ? currItem.get("type").getAsString() : "AIR";
                 int prevAmount = prevItem.has("amount") ? prevItem.get("amount").getAsInt() : 0;
                 int currAmount = currItem.has("amount") ? currItem.get("amount").getAsInt() : 0;
-                
+
                 if (!prevType.equals(currType) || prevAmount != currAmount) {
                     changed = true;
                 } else {
                     // Compare other properties (display_name, lore, enchantments, durability)
-                    String prevDisplayName = prevItem.has("display_name") ? prevItem.get("display_name").getAsString() : null;
-                    String currDisplayName = currItem.has("display_name") ? currItem.get("display_name").getAsString() : null;
-                    if ((prevDisplayName == null) != (currDisplayName == null) || 
-                        (prevDisplayName != null && !prevDisplayName.equals(currDisplayName))) {
+                    String prevDisplayName = prevItem.has("display_name") ? prevItem.get("display_name").getAsString()
+                            : null;
+                    String currDisplayName = currItem.has("display_name") ? currItem.get("display_name").getAsString()
+                            : null;
+                    if ((prevDisplayName == null) != (currDisplayName == null) ||
+                            (prevDisplayName != null && !prevDisplayName.equals(currDisplayName))) {
                         changed = true;
                     } else {
                         // Compare durability
@@ -1053,7 +1060,7 @@ public class PlayerListListener implements Listener {
                     }
                 }
             }
-            
+
             if (changed) {
                 // Slot changed, include current item in diff
                 if (currItem != null) {
@@ -1070,7 +1077,7 @@ public class PlayerListListener implements Listener {
                 diff.add(com.google.gson.JsonNull.INSTANCE);
             }
         }
-        
+
         return diff;
     }
 
