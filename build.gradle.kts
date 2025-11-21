@@ -29,6 +29,9 @@ repositories {
 
     // PaperMC APIs
     maven("https://repo.papermc.io/repository/maven-public/")
+
+    // Vault API
+    maven { url = uri("https://jitpack.io") }
 }
 
 dependencies {
@@ -36,6 +39,9 @@ dependencies {
     compileOnly("org.spigotmc:spigot-api:1.20.4-R0.1-SNAPSHOT")
     compileOnly("org.apache.logging.log4j:log4j-core:2.17.0")
     compileOnly("org.apache.logging.log4j:log4j-api:2.17.0")
+
+    // Vault API (for economy support)
+    compileOnly("com.github.MilkBowl:VaultAPI:1.7")
 
     // WebSocket Client (fat-jar included)
     implementation("org.java-websocket:Java-WebSocket:1.5.4")
