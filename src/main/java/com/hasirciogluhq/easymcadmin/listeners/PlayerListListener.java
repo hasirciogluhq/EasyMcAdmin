@@ -4,7 +4,11 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
 import com.hasirciogluhq.easymcadmin.packets.Packet;
-import com.hasirciogluhq.easymcadmin.packets.PacketType;
+import com.hasirciogluhq.easymcadmin.packets.player.PlayerJoinPacket;
+import com.hasirciogluhq.easymcadmin.packets.player.PlayerLeftPacket;
+import com.hasirciogluhq.easymcadmin.packets.player.PlayerInventoryUpdatePacket;
+import com.hasirciogluhq.easymcadmin.packets.player.PlayerDetailsUpdatePacket;
+import com.hasirciogluhq.easymcadmin.packets.player.PlayerChunkPacket;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.permission.Permission;
 import org.bukkit.Bukkit;
@@ -74,7 +78,7 @@ public class PlayerListListener implements Listener {
         economy = rsp.getProvider();
         plugin.getLogger().info("Economy plugin found: " + economy.getName());
     }
-    
+
     /**
      * Setup Vault Permissions if available
      */
@@ -84,7 +88,8 @@ public class PlayerListListener implements Listener {
             return;
         }
 
-        RegisteredServiceProvider<Permission> rsp = Bukkit.getServer().getServicesManager().getRegistration(Permission.class);
+        RegisteredServiceProvider<Permission> rsp = Bukkit.getServer().getServicesManager()
+                .getRegistration(Permission.class);
         if (rsp == null) {
             plugin.getLogger().info("No permission plugin found, permission features will be disabled");
             return;
@@ -129,7 +134,7 @@ public class PlayerListListener implements Listener {
         Player player = event.getPlayer();
         sendPlayerLeft(player);
     }
-    
+
     /**
      * Handle inventory events - send update when inventory changes
      */
@@ -143,7 +148,7 @@ public class PlayerListListener implements Listener {
             }, 1L);
         }
     }
-    
+
     @EventHandler
     public void onInventoryOpen(InventoryOpenEvent event) {
         if (event.getPlayer() instanceof Player) {
@@ -151,7 +156,7 @@ public class PlayerListListener implements Listener {
             sendPlayerInventoryUpdate(player, false);
         }
     }
-    
+
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
         if (event.getPlayer() instanceof Player) {
@@ -159,7 +164,7 @@ public class PlayerListListener implements Listener {
             sendPlayerInventoryUpdate(player, false);
         }
     }
-    
+
     @EventHandler
     public void onPlayerDropItem(PlayerDropItemEvent event) {
         Player player = event.getPlayer();
@@ -168,7 +173,7 @@ public class PlayerListListener implements Listener {
             sendPlayerInventoryUpdate(player, false);
         }, 1L);
     }
-    
+
     @EventHandler
     public void onEntityPickupItem(EntityPickupItemEvent event) {
         if (event.getEntity() instanceof Player) {
@@ -179,27 +184,29 @@ public class PlayerListListener implements Listener {
             }, 1L);
         }
     }
-    
+
     @EventHandler
     public void onBlockPlace(BlockPlaceEvent event) {
         Player player = event.getPlayer();
-        // Send inventory update immediately - inventory is already updated at this point
+        // Send inventory update immediately - inventory is already updated at this
+        // point
         sendPlayerInventoryUpdate(player, false);
     }
-    
+
     @EventHandler
     public void onPlayerItemConsume(PlayerItemConsumeEvent event) {
         Player player = event.getPlayer();
-        // Send inventory update immediately - inventory is already updated at this point
+        // Send inventory update immediately - inventory is already updated at this
+        // point
         sendPlayerInventoryUpdate(player, false);
     }
-    
+
     @EventHandler
     public void onPlayerInteract(PlayerInteractEvent event) {
         Player player = event.getPlayer();
         // Only trigger on right-click with items (food, blocks, etc.)
-        if (event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_AIR || 
-            event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) {
+        if (event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_AIR ||
+                event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) {
             if (event.getItem() != null) {
                 // Send inventory update immediately - inventory changes happen synchronously
                 sendPlayerInventoryUpdate(player, false);
@@ -221,36 +228,13 @@ public class PlayerListListener implements Listener {
         }
 
         try {
-            JsonObject metadata = new JsonObject();
-            metadata.addProperty("action", "player.join");
-            metadata.addProperty("requires_response", false);
-
-            JsonObject payload = new JsonObject();
             JsonObject playerObj = getPlayerDetailsPayload(player);
             playerObj.addProperty("online", true);
-            
+
             // Add inventory, ender chest data for join events
             addPlayerInventoryData(playerObj, player);
 
-            payload.add("player", playerObj);
-
-            Packet packet = new Packet(
-                    UUID.randomUUID().toString(),
-                    PacketType.EVENT,
-                    metadata,
-                    payload) {
-                @Override
-                public JsonObject toJson() {
-                    JsonObject json = new JsonObject();
-                    json.addProperty("packet_id", getPacketId());
-                    json.addProperty("packet_type", getPacketType().name());
-                    json.add("metadata", getMetadata());
-                    json.add("payload", getPayload());
-                    json.addProperty("timestamp", getTimestamp());
-                    return json;
-                }
-            };
-
+            Packet packet = new PlayerJoinPacket(playerObj);
             plugin.getWebSocketManager().sendPacket(packet);
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to send player join event: " + e.getMessage());
@@ -267,33 +251,10 @@ public class PlayerListListener implements Listener {
         }
 
         try {
-            JsonObject metadata = new JsonObject();
-            metadata.addProperty("action", "player.left");
-            metadata.addProperty("requires_response", false);
-
-            JsonObject payload = new JsonObject();
             JsonObject playerObj = getPlayerDetailsPayload(player);
             playerObj.addProperty("online", false);
 
-            payload.add("player", playerObj);
-
-            Packet packet = new Packet(
-                    UUID.randomUUID().toString(),
-                    PacketType.EVENT,
-                    metadata,
-                    payload) {
-                @Override
-                public JsonObject toJson() {
-                    JsonObject json = new JsonObject();
-                    json.addProperty("packet_id", getPacketId());
-                    json.addProperty("packet_type", getPacketType().name());
-                    json.add("metadata", getMetadata());
-                    json.add("payload", getPayload());
-                    json.addProperty("timestamp", getTimestamp());
-                    return json;
-                }
-            };
-
+            Packet packet = new PlayerLeftPacket(playerObj);
             plugin.getWebSocketManager().sendPacket(packet);
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to send player left event: " + e.getMessage());
@@ -302,9 +263,12 @@ public class PlayerListListener implements Listener {
 
     /**
      * Send player inventory update (only inventory data)
-     * @param fullSync If true, sends full inventory sync (includes ender chest), if false sends diff sync
-     * Used for inventory events (click, open, close, etc.) and full sync requests
-     * Action: player.inventory_update
+     * 
+     * @param fullSync If true, sends full inventory sync (includes ender chest), if
+     *                 false sends diff sync
+     *                 Used for inventory events (click, open, close, etc.) and full
+     *                 sync requests
+     *                 Action: player.inventory_update
      */
     public void sendPlayerInventoryUpdate(Player player, boolean fullSync) {
         if (!plugin.getWebSocketManager().isConnected()) {
@@ -316,25 +280,15 @@ public class PlayerListListener implements Listener {
         String enderChestHash = fullSync ? calculateEnderChestHash(player.getEnderChest()) : "";
 
         try {
-            JsonObject metadata = new JsonObject();
-            metadata.addProperty("action", "player.inventory_update");
-            metadata.addProperty("requires_response", false);
-            metadata.addProperty("inventory_hash", inventoryHash);
-            if (fullSync && !enderChestHash.isEmpty()) {
-                metadata.addProperty("ender_chest_hash", enderChestHash);
-            }
-            metadata.addProperty("full_sync", fullSync);
-
-            JsonObject payload = new JsonObject();
             JsonObject playerObj = new JsonObject();
             playerObj.addProperty("uuid", playerUUID.toString());
-            
+
             // Send inventory
             PlayerInventory inventory = player.getInventory();
             if (inventory != null) {
                 playerObj.add("inventory", serializeInventory(inventory));
             }
-            
+
             // Send ender chest only if full sync
             if (fullSync) {
                 org.bukkit.inventory.Inventory enderChest = player.getEnderChest();
@@ -343,31 +297,13 @@ public class PlayerListListener implements Listener {
                 }
             }
 
-            payload.add("player", playerObj);
-
-            Packet packet = new Packet(
-                    UUID.randomUUID().toString(),
-                    PacketType.EVENT,
-                    metadata,
-                    payload) {
-                @Override
-                public JsonObject toJson() {
-                    JsonObject json = new JsonObject();
-                    json.addProperty("packet_id", getPacketId());
-                    json.addProperty("packet_type", getPacketType().name());
-                    json.add("metadata", getMetadata());
-                    json.add("payload", getPayload());
-                    json.addProperty("timestamp", getTimestamp());
-                    return json;
-                }
-            };
-
+            Packet packet = new PlayerInventoryUpdatePacket(inventoryHash, enderChestHash, fullSync, playerObj);
             plugin.getWebSocketManager().sendPacket(packet);
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to send player inventory update: " + e.getMessage());
         }
     }
-    
+
     /**
      * Send player details update (all player info except inventory)
      * Used for periodic ticker updates
@@ -379,31 +315,8 @@ public class PlayerListListener implements Listener {
         }
 
         try {
-            JsonObject metadata = new JsonObject();
-            metadata.addProperty("action", "player.details_update");
-            metadata.addProperty("requires_response", false);
-
-            JsonObject payload = new JsonObject();
             JsonObject playerObj = getPlayerDetailsPayload(player);
-            payload.add("player", playerObj);
-
-            Packet packet = new Packet(
-                    UUID.randomUUID().toString(),
-                    PacketType.EVENT,
-                    metadata,
-                    payload) {
-                @Override
-                public JsonObject toJson() {
-                    JsonObject json = new JsonObject();
-                    json.addProperty("packet_id", getPacketId());
-                    json.addProperty("packet_type", getPacketType().name());
-                    json.add("metadata", getMetadata());
-                    json.add("payload", getPayload());
-                    json.addProperty("timestamp", getTimestamp());
-                    return json;
-                }
-            };
-
+            Packet packet = new PlayerDetailsUpdatePacket(playerObj);
             plugin.getWebSocketManager().sendPacket(packet);
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to send player details update: " + e.getMessage());
@@ -454,7 +367,7 @@ public class PlayerListListener implements Listener {
             }
         }
     }
-    
+
     /**
      * Handle inventory sync request from backend
      * Called when backend detects hash mismatch
@@ -476,20 +389,11 @@ public class PlayerListListener implements Listener {
         }
 
         try {
-            JsonObject metadata = new JsonObject();
-            metadata.addProperty("action", "player.chunk");
-            metadata.addProperty("requires_response", false);
-
-            JsonObject payload = new JsonObject();
-            payload.addProperty("chunk_index", chunkIndex);
-            payload.addProperty("total_chunks", totalChunks);
-            payload.addProperty("is_last_chunk", isLastChunk);
-
             JsonArray playerArray = new JsonArray();
 
             for (OfflinePlayer offlinePlayer : players) {
                 JsonObject playerObj;
-                
+
                 // Use common function for both online and offline players
                 if (offlinePlayer.isOnline() && offlinePlayer.getPlayer() != null) {
                     Player player = offlinePlayer.getPlayer();
@@ -501,25 +405,8 @@ public class PlayerListListener implements Listener {
 
                 playerArray.add(playerObj);
             }
-            payload.add("players", playerArray);
 
-            Packet packet = new Packet(
-                    UUID.randomUUID().toString(),
-                    PacketType.EVENT,
-                    metadata,
-                    payload) {
-                @Override
-                public JsonObject toJson() {
-                    JsonObject json = new JsonObject();
-                    json.addProperty("packet_id", getPacketId());
-                    json.addProperty("packet_type", getPacketType().name());
-                    json.add("metadata", getMetadata());
-                    json.add("payload", getPayload());
-                    json.addProperty("timestamp", getTimestamp());
-                    return json;
-                }
-            };
-
+            Packet packet = new PlayerChunkPacket(chunkIndex, totalChunks, isLastChunk, playerArray);
             plugin.getWebSocketManager().sendPacket(packet);
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to send player chunk: " + e.getMessage());
@@ -532,7 +419,8 @@ public class PlayerListListener implements Listener {
 
     /**
      * Get player details payload (common function for details and chunk)
-     * Includes: username, display_name, player_list_name, ping, first_played, last_played,
+     * Includes: username, display_name, player_list_name, ping, first_played,
+     * last_played,
      * balance, currency, location, experience, groups
      */
     private JsonObject getPlayerDetailsPayload(Player player) {
@@ -545,7 +433,7 @@ public class PlayerListListener implements Listener {
         playerObj.addProperty("ping", player.getPing());
         playerObj.addProperty("first_played", player.getFirstPlayed());
         playerObj.addProperty("last_played", player.getLastPlayed());
-        
+
         // Get economy balance if available
         Double balance = getPlayerBalance(player);
         if (balance != null) {
@@ -555,26 +443,26 @@ public class PlayerListListener implements Listener {
         if (currencyName != null) {
             playerObj.addProperty("currency", currencyName);
         }
-        
+
         // Send location
         Location loc = player.getLocation();
         if (loc != null) {
             playerObj.add("location", serializeLocation(loc));
         }
-        
+
         // Send experience
         JsonObject expObj = new JsonObject();
         expObj.addProperty("level", player.getLevel());
         expObj.addProperty("exp", player.getExp());
         expObj.addProperty("total_exp", player.getTotalExperience());
         playerObj.add("experience", expObj);
-        
+
         // Get and send permission groups/ranks
         String primaryGroup = getPlayerPrimaryGroup(player);
         if (primaryGroup != null) {
             playerObj.addProperty("primary_group", primaryGroup);
         }
-        
+
         String[] groups = getPlayerGroups(player);
         if (groups != null && groups.length > 0) {
             JsonArray groupsArray = new JsonArray();
@@ -583,7 +471,7 @@ public class PlayerListListener implements Listener {
             }
             playerObj.add("groups", groupsArray);
         }
-        
+
         return playerObj;
     }
 
@@ -596,19 +484,19 @@ public class PlayerListListener implements Listener {
         playerObj.addProperty("uuid", offlinePlayer.getUniqueId().toString());
         playerObj.addProperty("username", offlinePlayer.getName() != null ? offlinePlayer.getName() : "Unknown");
         playerObj.addProperty("online", false);
-        
+
         // Display name - N/A for offline players
         playerObj.addProperty("display_name", "N/A");
-        
+
         // Player list name - N/A for offline players
         playerObj.addProperty("player_list_name", "N/A");
-        
+
         // Ping - N/A for offline players
         playerObj.addProperty("ping", -1);
-        
+
         playerObj.addProperty("first_played", offlinePlayer.getFirstPlayed());
         playerObj.addProperty("last_played", offlinePlayer.getLastPlayed());
-        
+
         // Get economy balance if available
         Double balance = getPlayerBalance(offlinePlayer);
         if (balance != null) {
@@ -616,14 +504,14 @@ public class PlayerListListener implements Listener {
         } else {
             playerObj.addProperty("balance", 0.0);
         }
-        
+
         String currencyName = getCurrencyName();
         if (currencyName != null) {
             playerObj.addProperty("currency", currencyName);
         } else {
             playerObj.addProperty("currency", "N/A");
         }
-        
+
         // Location - N/A for offline players
         JsonObject locObj = new JsonObject();
         locObj.addProperty("world", "N/A");
@@ -633,14 +521,14 @@ public class PlayerListListener implements Listener {
         locObj.addProperty("yaw", 0.0);
         locObj.addProperty("pitch", 0.0);
         playerObj.add("location", locObj);
-        
+
         // Experience - N/A for offline players
         JsonObject expObj = new JsonObject();
         expObj.addProperty("level", 0);
         expObj.addProperty("exp", 0.0);
         expObj.addProperty("total_exp", 0);
         playerObj.add("experience", expObj);
-        
+
         // Groups - try to get from permission plugin if available
         // For offline players, we can try to get groups from permission plugin
         String primaryGroup = getOfflinePlayerPrimaryGroup(offlinePlayer);
@@ -649,7 +537,7 @@ public class PlayerListListener implements Listener {
         } else {
             playerObj.addProperty("primary_group", "N/A");
         }
-        
+
         String[] groups = getOfflinePlayerGroups(offlinePlayer);
         if (groups != null && groups.length > 0) {
             JsonArray groupsArray = new JsonArray();
@@ -661,37 +549,38 @@ public class PlayerListListener implements Listener {
             // Empty array if no groups
             playerObj.add("groups", new JsonArray());
         }
-        
+
         return playerObj;
     }
 
     /**
-     * Add player inventory, ender chest, experience, and location data to player object
+     * Add player inventory, ender chest, experience, and location data to player
+     * object
      */
     private void addPlayerInventoryData(JsonObject playerObj, Player player) {
         if (player == null) {
             return;
         }
-        
+
         // Inventory
         PlayerInventory inventory = player.getInventory();
         if (inventory != null) {
             playerObj.add("inventory", serializeInventory(inventory));
         }
-        
+
         // Ender Chest
         org.bukkit.inventory.Inventory enderChest = player.getEnderChest();
         if (enderChest != null) {
             playerObj.add("ender_chest", serializeEnderChest(enderChest));
         }
-        
+
         // Experience
         JsonObject expObj = new JsonObject();
         expObj.addProperty("level", player.getLevel());
         expObj.addProperty("exp", player.getExp());
         expObj.addProperty("total_exp", player.getTotalExperience());
         playerObj.add("experience", expObj);
-        
+
         // Location
         Location loc = player.getLocation();
         if (loc != null) {
@@ -731,14 +620,14 @@ public class PlayerListListener implements Listener {
         if (economy == null) {
             return null;
         }
-        
+
         try {
             return economy.currencyNameSingular();
         } catch (Exception e) {
             return null;
         }
     }
-    
+
     /**
      * Get player's primary group (rank)
      * 
@@ -749,17 +638,18 @@ public class PlayerListListener implements Listener {
         if (permission == null || player == null) {
             return null;
         }
-        
+
         try {
             String world = player.getWorld() != null ? player.getWorld().getName() : null;
             String group = permission.getPrimaryGroup(world, player);
             return group != null && !group.isEmpty() ? group : null;
         } catch (Exception e) {
-            plugin.getLogger().warning("Failed to get primary group for player " + player.getName() + ": " + e.getMessage());
+            plugin.getLogger()
+                    .warning("Failed to get primary group for player " + player.getName() + ": " + e.getMessage());
             return null;
         }
     }
-    
+
     /**
      * Get all player groups (including ranks)
      * 
@@ -770,7 +660,7 @@ public class PlayerListListener implements Listener {
         if (permission == null || player == null) {
             return null;
         }
-        
+
         try {
             String world = player.getWorld() != null ? player.getWorld().getName() : null;
             String[] groups = permission.getPlayerGroups(world, player);
@@ -791,7 +681,7 @@ public class PlayerListListener implements Listener {
         if (permission == null || offlinePlayer == null) {
             return null;
         }
-        
+
         try {
             // Try to get primary group for offline player
             // Some permission plugins support this, some don't
@@ -802,7 +692,7 @@ public class PlayerListListener implements Listener {
             return null;
         }
     }
-    
+
     /**
      * Get all offline player groups (including ranks)
      * 
@@ -813,7 +703,7 @@ public class PlayerListListener implements Listener {
         if (permission == null || offlinePlayer == null) {
             return null;
         }
-        
+
         try {
             // Try to get groups for offline player
             // Some permission plugins support this, some don't
@@ -837,14 +727,14 @@ public class PlayerListListener implements Listener {
         if (loc == null) {
             return locObj;
         }
-        
+
         locObj.addProperty("world", loc.getWorld() != null ? loc.getWorld().getName() : "unknown");
         locObj.addProperty("x", loc.getX());
         locObj.addProperty("y", loc.getY());
         locObj.addProperty("z", loc.getZ());
         locObj.addProperty("yaw", loc.getYaw());
         locObj.addProperty("pitch", loc.getPitch());
-        
+
         return locObj;
     }
 
@@ -864,18 +754,18 @@ public class PlayerListListener implements Listener {
         if (inventory == null) {
             return invArray;
         }
-        
+
         // Get all contents in correct order
         ItemStack[] storageContents = inventory.getStorageContents(); // Slots 0-35
         ItemStack[] armorContents = inventory.getArmorContents(); // Armor array: boots, leggings, chestplate, helmet
         ItemStack offhand = inventory.getItemInOffHand(); // Offhand slot
-        
+
         // Add storage contents (0-35: hotbar + main inventory)
         for (ItemStack item : storageContents) {
             JsonObject itemObj = serializeItemStack(item);
             invArray.add(itemObj);
         }
-        
+
         // Add armor slots (36-39)
         // armorContents array: [boots, leggings, chestplate, helmet]
         // But in MC, slots are: 36=boots, 37=leggings, 38=chestplate, 39=helmet
@@ -893,13 +783,13 @@ public class PlayerListListener implements Listener {
                 invArray.add(emptyItem);
             }
         }
-        
+
         // Add offhand (slot 40)
         invArray.add(serializeItemStack(offhand));
-        
+
         return invArray;
     }
-    
+
     /**
      * Serialize ender chest inventory to JSON array
      */
@@ -908,7 +798,7 @@ public class PlayerListListener implements Listener {
         if (enderChest == null) {
             return invArray;
         }
-        
+
         ItemStack[] contents = enderChest.getStorageContents();
         for (ItemStack item : contents) {
             JsonObject itemObj = serializeItemStack(item);
@@ -916,7 +806,7 @@ public class PlayerListListener implements Listener {
         }
         return invArray;
     }
-    
+
     /**
      * Serialize ItemStack to JSON object
      */
@@ -927,14 +817,14 @@ public class PlayerListListener implements Listener {
             itemObj.addProperty("amount", 0);
             return itemObj;
         }
-        
+
         itemObj.addProperty("type", item.getType().name());
         itemObj.addProperty("amount", item.getAmount());
-        
+
         if (item.hasItemMeta() && item.getItemMeta().hasDisplayName()) {
             itemObj.addProperty("display_name", item.getItemMeta().getDisplayName());
         }
-        
+
         if (item.hasItemMeta() && item.getItemMeta().hasLore()) {
             JsonArray loreArray = new JsonArray();
             for (String line : item.getItemMeta().getLore()) {
@@ -942,7 +832,19 @@ public class PlayerListListener implements Listener {
             }
             itemObj.add("lore", loreArray);
         }
-        
+
+        // Add enchantments
+        if (item.hasItemMeta() && item.getItemMeta().hasEnchants()) {
+            JsonArray enchantArray = new JsonArray();
+            for (org.bukkit.enchantments.Enchantment enchant : item.getItemMeta().getEnchants().keySet()) {
+                JsonObject enchantObj = new JsonObject();
+                enchantObj.addProperty("name", enchant.getKey().getKey());
+                enchantObj.addProperty("level", item.getItemMeta().getEnchantLevel(enchant));
+                enchantArray.add(enchantObj);
+            }
+            itemObj.add("enchantments", enchantArray);
+        }
+
         // Use ItemMeta for durability if available (getDurability is deprecated)
         if (item.hasItemMeta() && item.getItemMeta() instanceof org.bukkit.inventory.meta.Damageable) {
             org.bukkit.inventory.meta.Damageable damageable = (org.bukkit.inventory.meta.Damageable) item.getItemMeta();
@@ -950,7 +852,7 @@ public class PlayerListListener implements Listener {
                 itemObj.addProperty("durability", damageable.getDamage());
             }
         }
-        
+
         return itemObj;
     }
 
@@ -965,14 +867,14 @@ public class PlayerListListener implements Listener {
         if (inventory == null) {
             return "";
         }
-        
+
         try {
             JsonArray invArray = serializeInventory(inventory);
             String inventoryJson = invArray.toString();
-            
+
             MessageDigest md = MessageDigest.getInstance("MD5");
             byte[] hashBytes = md.digest(inventoryJson.getBytes("UTF-8"));
-            
+
             StringBuilder sb = new StringBuilder();
             for (byte b : hashBytes) {
                 sb.append(String.format("%02x", b));
@@ -983,7 +885,7 @@ public class PlayerListListener implements Listener {
             return "";
         }
     }
-    
+
     /**
      * Calculate hash of ender chest for diff detection
      */
@@ -991,14 +893,14 @@ public class PlayerListListener implements Listener {
         if (enderChest == null) {
             return "";
         }
-        
+
         try {
             JsonArray ecArray = serializeEnderChest(enderChest);
             String enderChestJson = ecArray.toString();
-            
+
             MessageDigest md = MessageDigest.getInstance("MD5");
             byte[] hashBytes = md.digest(enderChestJson.getBytes("UTF-8"));
-            
+
             StringBuilder sb = new StringBuilder();
             for (byte b : hashBytes) {
                 sb.append(String.format("%02x", b));
