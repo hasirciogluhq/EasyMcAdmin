@@ -17,7 +17,10 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.player.PlayerItemConsumeEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
@@ -648,6 +651,33 @@ public class PlayerListListener implements Listener {
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 sendPlayerUpdate(player);
             }, 1L);
+        }
+    }
+    
+    @EventHandler
+    public void onBlockPlace(BlockPlaceEvent event) {
+        Player player = event.getPlayer();
+        // Send update immediately - inventory is already updated at this point
+        sendPlayerUpdate(player);
+    }
+    
+    @EventHandler
+    public void onPlayerItemConsume(PlayerItemConsumeEvent event) {
+        Player player = event.getPlayer();
+        // Send update immediately - inventory is already updated at this point
+        sendPlayerUpdate(player);
+    }
+    
+    @EventHandler
+    public void onPlayerInteract(PlayerInteractEvent event) {
+        Player player = event.getPlayer();
+        // Only trigger on right-click with items (food, blocks, etc.)
+        if (event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_AIR || 
+            event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) {
+            if (event.getItem() != null) {
+                // Send update immediately - inventory changes happen synchronously
+                sendPlayerUpdate(player);
+            }
         }
     }
 }
