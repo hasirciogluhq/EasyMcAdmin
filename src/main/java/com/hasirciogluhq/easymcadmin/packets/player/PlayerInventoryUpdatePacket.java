@@ -26,7 +26,8 @@ public class PlayerInventoryUpdatePacket extends Packet {
         metadata.addProperty("action", "player.inventory_update");
         metadata.addProperty("requires_response", false);
         metadata.addProperty("inventory_hash", inventoryHash);
-        if (fullSync && enderChestHash != null && !enderChestHash.isEmpty()) {
+        // Always include ender chest hash if available (for validation)
+        if (enderChestHash != null && !enderChestHash.isEmpty()) {
             metadata.addProperty("ender_chest_hash", enderChestHash);
         }
         metadata.addProperty("full_sync", fullSync);

@@ -34,7 +34,9 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -48,6 +50,12 @@ public class PlayerListListener implements Listener {
     private boolean initialSyncDone = false;
     private Economy economy = null;
     private Permission permission = null;
+    
+    // Store previous inventory and ender chest states for diff calculation
+    private final Map<UUID, JsonArray> previousInventories = new HashMap<>();
+    private final Map<UUID, JsonArray> previousEnderChests = new HashMap<>();
+    private final Map<UUID, String> previousInventoryHashes = new HashMap<>();
+    private final Map<UUID, String> previousEnderChestHashes = new HashMap<>();
 
     // ============================================================================
     // CONSTRUCTOR & SETUP
@@ -133,6 +141,13 @@ public class PlayerListListener implements Listener {
     public void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
         sendPlayerLeft(player);
+        
+        // Clean up stored states when player quits
+        UUID playerUUID = player.getUniqueId();
+        previousInventories.remove(playerUUID);
+        previousEnderChests.remove(playerUUID);
+        previousInventoryHashes.remove(playerUUID);
+        previousEnderChestHashes.remove(playerUUID);
     }
 
     /**
@@ -230,6 +245,9 @@ public class PlayerListListener implements Listener {
         try {
             JsonObject playerObj = getPlayerDetailsPayload(player);
             playerObj.addProperty("online", true);
+            
+            // Set last_played to current time when player joins
+            playerObj.addProperty("last_played", System.currentTimeMillis());
 
             // Add inventory, ender chest data for join events
             addPlayerInventoryData(playerObj, player);
@@ -276,24 +294,74 @@ public class PlayerListListener implements Listener {
         }
 
         UUID playerUUID = player.getUniqueId();
+        
+        // Serialize current inventory and ender chest
+        JsonArray currentInventory = null;
+        JsonArray currentEnderChest = null;
+        
+        PlayerInventory inventory = player.getInventory();
+        if (inventory != null) {
+            currentInventory = serializeInventory(inventory);
+        }
+        
+        org.bukkit.inventory.Inventory enderChest = player.getEnderChest();
+        if (enderChest != null) {
+            currentEnderChest = serializeEnderChest(enderChest);
+        }
+        
+        // Calculate hashes for both inventory and ender chest
         String inventoryHash = calculateInventoryHash(player.getInventory());
-        String enderChestHash = fullSync ? calculateEnderChestHash(player.getEnderChest()) : "";
+        String enderChestHash = calculateEnderChestHash(player.getEnderChest());
 
         try {
             JsonObject playerObj = new JsonObject();
             playerObj.addProperty("uuid", playerUUID.toString());
 
-            // Send inventory
-            PlayerInventory inventory = player.getInventory();
-            if (inventory != null) {
-                playerObj.add("inventory", serializeInventory(inventory));
-            }
-
-            // Send ender chest only if full sync
             if (fullSync) {
-                org.bukkit.inventory.Inventory enderChest = player.getEnderChest();
-                if (enderChest != null) {
-                    playerObj.add("ender_chest", serializeEnderChest(enderChest));
+                // Full sync: send complete inventory and ender chest
+                if (currentInventory != null) {
+                    playerObj.add("inventory", currentInventory);
+                }
+                if (currentEnderChest != null) {
+                    playerObj.add("ender_chest", currentEnderChest);
+                }
+                
+                // Update stored states
+                if (currentInventory != null) {
+                    previousInventories.put(playerUUID, currentInventory);
+                    previousInventoryHashes.put(playerUUID, inventoryHash);
+                }
+                if (currentEnderChest != null) {
+                    previousEnderChests.put(playerUUID, currentEnderChest);
+                    previousEnderChestHashes.put(playerUUID, enderChestHash);
+                }
+            } else {
+                // Diff sync: send only changed slots
+                JsonArray previousInventory = previousInventories.get(playerUUID);
+                JsonArray previousEnderChest = previousEnderChests.get(playerUUID);
+                String previousInventoryHash = previousInventoryHashes.get(playerUUID);
+                String previousEnderChestHash = previousEnderChestHashes.get(playerUUID);
+                
+                // Check if inventory hash changed
+                boolean inventoryChanged = !inventoryHash.equals(previousInventoryHash != null ? previousInventoryHash : "");
+                if (inventoryChanged && currentInventory != null) {
+                    JsonArray inventoryDiff = calculateInventoryDiff(previousInventory, currentInventory);
+                    playerObj.add("inventory", inventoryDiff);
+                    
+                    // Update stored state
+                    previousInventories.put(playerUUID, currentInventory);
+                    previousInventoryHashes.put(playerUUID, inventoryHash);
+                }
+                
+                // Check if ender chest hash changed
+                boolean enderChestChanged = !enderChestHash.equals(previousEnderChestHash != null ? previousEnderChestHash : "");
+                if (enderChestChanged && currentEnderChest != null) {
+                    JsonArray enderChestDiff = calculateEnderChestDiff(previousEnderChest, currentEnderChest);
+                    playerObj.add("ender_chest", enderChestDiff);
+                    
+                    // Update stored state
+                    previousEnderChests.put(playerUUID, currentEnderChest);
+                    previousEnderChestHashes.put(playerUUID, enderChestHash);
                 }
             }
 
@@ -432,7 +500,8 @@ public class PlayerListListener implements Listener {
         playerObj.addProperty("player_list_name", player.getPlayerListName());
         playerObj.addProperty("ping", player.getPing());
         playerObj.addProperty("first_played", player.getFirstPlayed());
-        playerObj.addProperty("last_played", player.getLastPlayed());
+        // last_played is only set on join, not in details updates
+        // Don't set it here - it will be set in sendPlayerJoin() if needed
 
         // Get economy balance if available
         Double balance = getPlayerBalance(player);
@@ -471,6 +540,9 @@ public class PlayerListListener implements Listener {
             }
             playerObj.add("groups", groupsArray);
         }
+
+        // Send game mode
+        playerObj.addProperty("game_mode", player.getGameMode().name());
 
         return playerObj;
     }
@@ -910,5 +982,104 @@ public class PlayerListListener implements Listener {
             plugin.getLogger().warning("Failed to calculate ender chest hash: " + e.getMessage());
             return "";
         }
+    }
+
+    /**
+     * Calculate diff between two inventory arrays (only changed slots)
+     * Returns a JsonArray with all slots, but only changed slots have actual item data
+     * Unchanged slots have empty JsonObject to maintain slot indices
+     */
+    private JsonArray calculateInventoryDiff(JsonArray previous, JsonArray current) {
+        JsonArray diff = new JsonArray();
+        
+        if (previous == null || previous.size() == 0) {
+            // No previous state, return full inventory
+            return current != null ? current : new JsonArray();
+        }
+        
+        if (current == null || current.size() == 0) {
+            // Current is empty, return array with empty items for all previous slots
+            for (int i = 0; i < previous.size(); i++) {
+                JsonObject emptyItem = new JsonObject();
+                emptyItem.addProperty("type", "AIR");
+                emptyItem.addProperty("amount", 0);
+                diff.add(emptyItem);
+            }
+            return diff;
+        }
+        
+        // Find the maximum size
+        int maxSize = Math.max(previous.size(), current.size());
+        
+        // Compare each slot
+        for (int i = 0; i < maxSize; i++) {
+            JsonObject prevItem = i < previous.size() && !previous.get(i).isJsonNull() 
+                ? previous.get(i).getAsJsonObject() : null;
+            JsonObject currItem = i < current.size() && !current.get(i).isJsonNull() 
+                ? current.get(i).getAsJsonObject() : null;
+            
+            // Check if slot changed
+            boolean changed = false;
+            if (prevItem == null && currItem == null) {
+                // Both null, no change - add null to maintain slot index
+                diff.add(com.google.gson.JsonNull.INSTANCE);
+                continue;
+            } else if (prevItem == null || currItem == null) {
+                // One is null, other is not - changed
+                changed = true;
+            } else {
+                // Compare item properties
+                String prevType = prevItem.has("type") ? prevItem.get("type").getAsString() : "AIR";
+                String currType = currItem.has("type") ? currItem.get("type").getAsString() : "AIR";
+                int prevAmount = prevItem.has("amount") ? prevItem.get("amount").getAsInt() : 0;
+                int currAmount = currItem.has("amount") ? currItem.get("amount").getAsInt() : 0;
+                
+                if (!prevType.equals(currType) || prevAmount != currAmount) {
+                    changed = true;
+                } else {
+                    // Compare other properties (display_name, lore, enchantments, durability)
+                    String prevDisplayName = prevItem.has("display_name") ? prevItem.get("display_name").getAsString() : null;
+                    String currDisplayName = currItem.has("display_name") ? currItem.get("display_name").getAsString() : null;
+                    if ((prevDisplayName == null) != (currDisplayName == null) || 
+                        (prevDisplayName != null && !prevDisplayName.equals(currDisplayName))) {
+                        changed = true;
+                    } else {
+                        // Compare durability
+                        int prevDurability = prevItem.has("durability") ? prevItem.get("durability").getAsInt() : -1;
+                        int currDurability = currItem.has("durability") ? currItem.get("durability").getAsInt() : -1;
+                        if (prevDurability != currDurability) {
+                            changed = true;
+                        }
+                    }
+                }
+            }
+            
+            if (changed) {
+                // Slot changed, include current item in diff
+                if (currItem != null) {
+                    diff.add(currItem);
+                } else {
+                    // Item removed, add empty item
+                    JsonObject emptyItem = new JsonObject();
+                    emptyItem.addProperty("type", "AIR");
+                    emptyItem.addProperty("amount", 0);
+                    diff.add(emptyItem);
+                }
+            } else {
+                // Slot unchanged, add null to maintain slot index
+                diff.add(com.google.gson.JsonNull.INSTANCE);
+            }
+        }
+        
+        return diff;
+    }
+
+    /**
+     * Calculate diff between two ender chest arrays (only changed slots)
+     * Same logic as inventory diff
+     */
+    private JsonArray calculateEnderChestDiff(JsonArray previous, JsonArray current) {
+        // Use same diff calculation logic as inventory
+        return calculateInventoryDiff(previous, current);
     }
 }
