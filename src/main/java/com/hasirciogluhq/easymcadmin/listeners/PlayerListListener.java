@@ -24,6 +24,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.plugin.RegisteredServiceProvider;
 
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -46,8 +47,8 @@ public class PlayerListListener implements Listener {
     }
 
     /**
-     * Start periodic task to update online players' full state
-     * Updates ping, display name, balance, and all other player data
+     * Start periodic task to update online players' state
+     * First sync sends full data, subsequent updates only send inventory diff if changed
      * Updates every 5 seconds (100 ticks)
      */
     private void startPlayerStateUpdateTask() {
@@ -56,9 +57,9 @@ public class PlayerListListener implements Listener {
                 return;
             }
 
-            // Update all online players' full state
+            // Update all online players (will send diff if already synced)
             for (Player player : Bukkit.getOnlinePlayers()) {
-                sendPlayerUpdate(player);
+                sendPlayerUpdate(player, false);
             }
         }, 100L, 100L); // Start after 5 seconds, repeat every 5 seconds
     }
@@ -115,6 +116,32 @@ public class PlayerListListener implements Listener {
             return economy.currencyNameSingular();
         } catch (Exception e) {
             return null;
+        }
+    }
+    
+    /**
+     * Calculate hash of inventory for diff detection
+     */
+    private String calculateInventoryHash(PlayerInventory inventory) {
+        if (inventory == null) {
+            return "";
+        }
+        
+        try {
+            JsonArray invArray = serializeInventory(inventory);
+            String inventoryJson = invArray.toString();
+            
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] hashBytes = md.digest(inventoryJson.getBytes("UTF-8"));
+            
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hashBytes) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to calculate inventory hash: " + e.getMessage());
+            return "";
         }
     }
     
@@ -280,6 +307,7 @@ public class PlayerListListener implements Listener {
     /**
      * Send all offline players in chunks after server is ready
      * Called when WebSocket connection is established
+     * Also sends full sync for all online players
      */
     public void sendAllOfflinePlayers() {
         if (initialSyncDone || !plugin.getWebSocketManager().isConnected()) {
@@ -287,6 +315,11 @@ public class PlayerListListener implements Listener {
         }
 
         initialSyncDone = true;
+
+        // First, send full sync for all online players
+        for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {
+            sendPlayerUpdate(onlinePlayer, true);
+        }
 
         // Get all offline players (including online ones)
         OfflinePlayer[] allPlayers = Bukkit.getOfflinePlayers();
@@ -313,6 +346,17 @@ public class PlayerListListener implements Listener {
 
                 chunk.clear();
             }
+        }
+    }
+    
+    /**
+     * Handle full sync request from backend
+     * Called when backend detects hash mismatch
+     */
+    public void handleFullSyncRequest(UUID playerUUID) {
+        Player player = Bukkit.getPlayer(playerUUID);
+        if (player != null && player.isOnline()) {
+            sendPlayerUpdate(player, true);
         }
     }
 
@@ -395,6 +439,8 @@ public class PlayerListListener implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         sendPlayerEvent(player, "join");
+        // Send full sync on join
+        sendPlayerUpdate(player, true);
     }
 
     @EventHandler
@@ -404,42 +450,61 @@ public class PlayerListListener implements Listener {
     }
 
     /**
-     * Send player update event (for balance changes, ping updates, etc.)
+     * Send player update event
+     * Plugin does NOT maintain state - always sends current inventory hash and inventory data
+     * Backend will validate hash by calculating hash(currentInventory + diff)
      */
-    public void sendPlayerUpdate(Player player) {
+    public void sendPlayerUpdate(Player player, boolean forceFullSync) {
         if (!plugin.getWebSocketManager().isConnected()) {
             return;
         }
+
+        UUID playerUUID = player.getUniqueId();
+        
+        // Calculate hash of current inventory (new inventory)
+        String newInventoryHash = calculateInventoryHash(player.getInventory());
 
         try {
             JsonObject metadata = new JsonObject();
             metadata.addProperty("action", "player_events");
             metadata.addProperty("event_type", "update");
             metadata.addProperty("requires_response", false);
+            metadata.addProperty("inventory_hash", newInventoryHash);
+            metadata.addProperty("full_sync", forceFullSync);
 
             JsonObject payload = new JsonObject();
             JsonObject playerObj = new JsonObject();
-            playerObj.addProperty("uuid", player.getUniqueId().toString());
+            playerObj.addProperty("uuid", playerUUID.toString());
             playerObj.addProperty("username", player.getName());
             playerObj.addProperty("online", true);
-            playerObj.addProperty("display_name", player.getDisplayName());
-            playerObj.addProperty("player_list_name", player.getPlayerListName());
-            playerObj.addProperty("ping", player.getPing());
-            playerObj.addProperty("first_played", player.getFirstPlayed());
-            playerObj.addProperty("last_played", player.getLastPlayed());
-
-            // Get economy balance if available
-            Double balance = getPlayerBalance(player);
-            if (balance != null) {
-                playerObj.addProperty("balance", balance);
-            }
-            String currencyName = getCurrencyName();
-            if (currencyName != null) {
-                playerObj.addProperty("currency", currencyName);
-            }
             
-            // Add inventory, ender chest, experience, and location data
-            addPlayerInventoryData(playerObj, player);
+            if (forceFullSync) {
+                // Full sync: send all player data
+                playerObj.addProperty("display_name", player.getDisplayName());
+                playerObj.addProperty("player_list_name", player.getPlayerListName());
+                playerObj.addProperty("ping", player.getPing());
+                playerObj.addProperty("first_played", player.getFirstPlayed());
+                playerObj.addProperty("last_played", player.getLastPlayed());
+
+                // Get economy balance if available
+                Double balance = getPlayerBalance(player);
+                if (balance != null) {
+                    playerObj.addProperty("balance", balance);
+                }
+                String currencyName = getCurrencyName();
+                if (currencyName != null) {
+                    playerObj.addProperty("currency", currencyName);
+                }
+                
+                // Add inventory, ender chest, experience, and location data
+                addPlayerInventoryData(playerObj, player);
+            } else {
+                // Diff sync: send only inventory (backend will apply as diff)
+                PlayerInventory inventory = player.getInventory();
+                if (inventory != null) {
+                    playerObj.add("inventory", serializeInventory(inventory));
+                }
+            }
 
             payload.add("player", playerObj);
 
@@ -464,6 +529,13 @@ public class PlayerListListener implements Listener {
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to send player update: " + e.getMessage());
         }
+    }
+    
+    /**
+     * Overload for backward compatibility
+     */
+    public void sendPlayerUpdate(Player player) {
+        sendPlayerUpdate(player, false);
     }
 
     /**

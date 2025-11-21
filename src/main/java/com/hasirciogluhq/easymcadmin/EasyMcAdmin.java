@@ -135,6 +135,25 @@ public class EasyMcAdmin extends JavaPlugin {
                 }
                 break;
 
+            case "request_full_sync":
+                // Handle full sync request from backend (hash mismatch detected)
+                if (packet.getPayload().has("player_uuid")) {
+                    String playerUUIDStr = packet.getPayload().get("player_uuid").getAsString();
+                    try {
+                        UUID playerUUID = UUID.fromString(playerUUIDStr);
+                        org.bukkit.entity.Player player = getServer().getPlayer(playerUUID);
+                        if (player != null && player.isOnline()) {
+                            // Force full sync for this player
+                            if (playerListListener != null) {
+                                playerListListener.sendPlayerUpdate(player, true);
+                            }
+                        }
+                    } catch (IllegalArgumentException e) {
+                        getLogger().warning("Invalid player UUID in full sync request: " + playerUUIDStr);
+                    }
+                }
+                break;
+
             default:
                 getLogger().info("Unknown packet action: " + action);
         }
