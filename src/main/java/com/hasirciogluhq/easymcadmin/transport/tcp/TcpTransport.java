@@ -5,6 +5,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -74,7 +75,6 @@ public class TcpTransport implements TransportInterface {
                             int bytesRead = dataInputStream.read(packetData, totalRead, packetLength - totalRead);
                             if (bytesRead == -1) {
                                 isConnected = false;
-
                                 break;
                             }
                             totalRead += bytesRead;
@@ -102,7 +102,20 @@ public class TcpTransport implements TransportInterface {
                             }
                         }
 
+                    } catch (SocketTimeoutException e) {
+                        // Timeout - connection might still be alive, just no data
+                        // TCP keep-alive will handle connection health check
+                        // Continue loop instead of disconnecting
+                        plugin.getLogger().fine("[EasyMcAdmin] Read timeout (connection still alive)");
+                        continue;
                     } catch (IOException e) {
+                        // Check if it's a timeout error (some implementations throw IOException for timeout)
+                        if (e.getMessage() != null && e.getMessage().contains("timeout")) {
+                            plugin.getLogger().fine("[EasyMcAdmin] Read timeout (connection still alive)");
+                            continue;
+                        }
+                        
+                        // Real connection error - disconnect
                         if (isConnected) {
                             if (transportListener != null) {
                                 transportListener.onError(e);

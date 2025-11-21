@@ -104,7 +104,6 @@ public class TransportHandler implements TransportListener {
         Packet authPacket = new GenericAuthPacket(
                 EasyMcAdmin.getInstance().getConfig().getString("server.token", "1234567890"));
 
-        // 2 saniye sonra gönder
         Bukkit.getServer().getScheduler().runTaskLater(EasyMcAdmin.getInstance(), () -> {
             try {
                 manager.sendPacket(authPacket);
@@ -113,7 +112,7 @@ public class TransportHandler implements TransportListener {
                 EasyMcAdmin.getInstance().getLogger()
                         .warning("[EasyMcAdmin] Error while sending auth packet: " + e.getMessage());
             }
-        }, 20L * 2);
+        }, 6L);
 
     }
 
