@@ -1,6 +1,7 @@
 package com.hasirciogluhq.easymcadmin;
 
 import com.hasirciogluhq.easymcadmin.commands.MainCommand;
+import com.hasirciogluhq.easymcadmin.economy.EconomyManager;
 import com.hasirciogluhq.easymcadmin.metrics.MetricsScheduler;
 import com.hasirciogluhq.easymcadmin.packets.Packet;
 import com.hasirciogluhq.easymcadmin.transport.TransportHandler;
@@ -33,6 +34,7 @@ public class EasyMcAdmin extends JavaPlugin {
     private TransportManager transportManager;
     private TransportInterface transport;
     private com.hasirciogluhq.easymcadmin.listeners.PlayerListListener playerListListener;
+    private EconomyManager economyManager;
 
     @Override
     public void onEnable() {
@@ -87,6 +89,9 @@ public class EasyMcAdmin extends JavaPlugin {
 
         // Register commands
         registerCommands();
+
+        // Initialize economy manager
+        economyManager = new EconomyManager();
 
         // Register event listeners
         registerListeners();
@@ -213,6 +218,15 @@ public class EasyMcAdmin extends JavaPlugin {
      */
     public com.hasirciogluhq.easymcadmin.listeners.PlayerListListener getPlayerListListener() {
         return playerListListener;
+    }
+
+    /**
+     * Get the economy manager
+     * 
+     * @return EconomyManager instance
+     */
+    public EconomyManager getEconomyManager() {
+        return economyManager;
     }
 
     /**

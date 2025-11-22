@@ -4,6 +4,7 @@ import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
 import com.hasirciogluhq.easymcadmin.packets.Packet;
 import com.hasirciogluhq.easymcadmin.packets.auth.GenericAuthPacket;
 import com.hasirciogluhq.easymcadmin.packets.auth.GenericAuthPacketResponse;
+import com.hasirciogluhq.easymcadmin.packets.economy.EconomyConfigPacket;
 
 import org.bukkit.Bukkit;
 
@@ -60,6 +61,11 @@ public class TransportHandler implements TransportListener {
                                 .warning("Invalid player UUID in inventory sync request: " + playerUUIDStr);
                     }
                 }
+                break;
+
+            case "server.economy_config":
+                // Handle economy config update from backend
+                handleEconomyConfig(packet);
                 break;
 
             default:
@@ -124,6 +130,17 @@ public class TransportHandler implements TransportListener {
             } catch (IOException ioException) {
                 // Ignore disconnect errors
             }
+        }
+    }
+
+    private void handleEconomyConfig(Packet packet) {
+        EconomyConfigPacket economyConfigPacket = new EconomyConfigPacket(packet);
+        com.google.gson.JsonObject economyConfig = economyConfigPacket.getEconomyConfig();
+        
+        // Update economy manager with new config
+        if (EasyMcAdmin.getInstance().getEconomyManager() != null) {
+            EasyMcAdmin.getInstance().getEconomyManager().updateEconomyConfig(economyConfig);
+            EasyMcAdmin.getInstance().getLogger().info("Economy config updated from backend");
         }
     }
 }
