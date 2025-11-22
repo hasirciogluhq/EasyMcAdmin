@@ -28,6 +28,11 @@ public class ServerMetricsCollector {
         long totalMemory = Runtime.getRuntime().totalMemory();
         long freeMemory = Runtime.getRuntime().freeMemory();
         long usedMemory = totalMemory - freeMemory;
+        
+        // Memory metrics with total, used, and percentage
+        long memoryTotalMB = maxMemory / 1024 / 1024;
+        long memoryUsedMB = usedMemory / 1024 / 1024;
+        double memoryUsedPercentage = maxMemory > 0 ? (usedMemory * 100.0 / maxMemory) : 0.0;
 
         // CPU info
         double cpuLoad = 0.0;
@@ -41,6 +46,11 @@ public class ServerMetricsCollector {
             // CPU metrics not available
             cpuLoad = 0.0;
         }
+        
+        // CPU metrics with total (100%), used, and percentage
+        double cpuTotal = 100.0; // CPU is always 100% max
+        double cpuUsed = cpuLoad * 100.0; // Convert to percentage
+        double cpuUsedPercentage = cpuLoad * 100.0; // Same as used for CPU
 
         // TPS (Paper/Spigot) - use reflection since method may not exist in all
         // implementations
@@ -58,6 +68,11 @@ public class ServerMetricsCollector {
             // TPS not available (not Paper/Spigot or method doesn't exist)
             tps1m = -1.0;
         }
+        
+        // TPS metrics with total (20), used, and percentage
+        double tpsTotal = 20.0; // TPS is always 20 max
+        double tpsUsed = tps1m >= 0 ? tps1m : 0.0;
+        double tpsUsedPercentage = tps1m >= 0 ? (tps1m * 100.0 / 20.0) : 0.0;
 
         // Version information
         String serverName = Bukkit.getServer().getName(); // Paper, CraftBukkit, etc.
@@ -66,10 +81,28 @@ public class ServerMetricsCollector {
 
         data.put("onlinePlayers", online);
         data.put("maxPlayers", max);
-        data.put("memoryUsedMB", usedMemory / 1024 / 1024);
-        data.put("memoryMaxMB", maxMemory / 1024 / 1024);
-        data.put("cpuUsage", cpuLoad * 100.0);
-        data.put("tps", tps1m);
+        
+        // Memory metrics (detailed)
+        data.put("memory_total_mb", memoryTotalMB);
+        data.put("memory_used_mb", memoryUsedMB);
+        data.put("memory_used_percentage", memoryUsedPercentage);
+        
+        // CPU metrics (detailed)
+        data.put("cpu_total", cpuTotal);
+        data.put("cpu_used", cpuUsed);
+        data.put("cpu_used_percentage", cpuUsedPercentage);
+        
+        // TPS metrics (detailed)
+        data.put("tps_total", tpsTotal);
+        data.put("tps_used", tpsUsed);
+        data.put("tps_used_percentage", tpsUsedPercentage);
+        
+        // Legacy fields for backward compatibility (deprecated)
+        data.put("memoryUsedMB", memoryUsedMB);
+        data.put("memoryMaxMB", memoryTotalMB);
+        data.put("cpuUsage", cpuUsed);
+        data.put("tps", tpsUsed);
+        
         data.put("serverName", serverName);
         data.put("minecraftVersion", minecraftVersion);
         data.put("bukkitVersion", bukkitVersion);
