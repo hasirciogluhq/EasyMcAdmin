@@ -140,7 +140,7 @@ public class TransportHandler implements TransportListener {
         // Update economy manager with new config
         if (EasyMcAdmin.getInstance().getEconomyManager() != null) {
             EasyMcAdmin.getInstance().getEconomyManager().updateEconomyConfig(economyConfig);
-            EasyMcAdmin.getInstance().getLogger().info("Economy config updated from backend");
+            // EasyMcAdmin.getInstance().getLogger().info("Economy config updated from backend");
         }
     }
 }
