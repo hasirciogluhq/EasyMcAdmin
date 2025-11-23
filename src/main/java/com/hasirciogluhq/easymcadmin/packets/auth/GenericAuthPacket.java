@@ -11,7 +11,7 @@ public class GenericAuthPacket extends Packet {
     public GenericAuthPacket(String token) {
         super(
                 UUID.randomUUID().toString(),
-                PacketType.EVENT,
+                PacketType.RPC,
                 createMetadata(),
                 createPayload(token));
     }

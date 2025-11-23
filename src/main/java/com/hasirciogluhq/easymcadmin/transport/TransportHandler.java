@@ -22,8 +22,27 @@ public class TransportHandler implements TransportListener {
 
     @Override
     public void onPacket(Packet packet) {
-        // Handle RPC packets first (if authenticated)
+        // Handle RPC packets first
         if (packet.getPacketType() == PacketType.RPC) {
+            // If not authenticated, check if it's auth response
+            if (!manager.isAuthenticated()) {
+                String action = packet.getMetadata().has("action")
+                        ? packet.getMetadata().get("action").getAsString()
+                        : "";
+                if ("plugin.auth.response".equals(action)) {
+                    // Auth response - handle via RPC store
+                    try {
+                        RpcStore.getRpcStore().handlePacket(packet);
+                        return;
+                    } catch (Exception e) {
+                        EasyMcAdmin.getInstance().getLogger().warning("Failed to handle auth RPC response: " + e.getMessage());
+                        onAuthFailure("Failed to handle auth response");
+                        return;
+                    }
+                }
+            }
+            
+            // Handle other RPC packets
             try {
                 RpcStore.getRpcStore().handlePacket(packet);
                 return; // RPC handled, don't process as regular packet
@@ -38,10 +57,7 @@ public class TransportHandler implements TransportListener {
                 : "";
 
         if (!manager.isAuthenticated()) {
-            if (packet.getMetadata().has("action")
-                    && packet.getMetadata().get("action").getAsString().equals("plugin.auth.response")) {
-                onAuthResponse(packet);
-            }
+            // Only allow auth response packets when not authenticated
             return;
         }
 
@@ -51,9 +67,60 @@ public class TransportHandler implements TransportListener {
                 // Execute command from backend
                 if (packet.getPayload().has("command")) {
                     String command = packet.getPayload().get("command").getAsString();
-                    Bukkit.getServer().getScheduler().runTask(EasyMcAdmin.getInstance(), () -> {
-                        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
-                    });
+                    
+                    // If RPC packet, execute command and send response
+                    if (packet.getPacketType() == PacketType.RPC) {
+                        Bukkit.getServer().getScheduler().runTask(EasyMcAdmin.getInstance(), () -> {
+                            try {
+                                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
+                                
+                                // Send RPC response
+                                com.google.gson.JsonObject responseJson = new com.google.gson.JsonObject();
+                                responseJson.addProperty("packet_id", java.util.UUID.randomUUID().toString());
+                                responseJson.addProperty("packet_type", "RPC");
+                                
+                                com.google.gson.JsonObject responseMetadata = new com.google.gson.JsonObject();
+                                responseMetadata.addProperty("action", "console_command");
+                                responseJson.add("metadata", responseMetadata);
+                                
+                                com.google.gson.JsonObject responsePayload = new com.google.gson.JsonObject();
+                                responsePayload.addProperty("output", "Command executed: " + command);
+                                responseJson.add("payload", responsePayload);
+                                
+                                com.hasirciogluhq.easymcadmin.packets.GenericPacket responsePacket = 
+                                    new com.hasirciogluhq.easymcadmin.packets.GenericPacket(responseJson);
+                                
+                                manager.sendRpcResponsePacket(packet, responsePacket);
+                            } catch (Exception e) {
+                                // Send error response
+                                com.google.gson.JsonObject errorJson = new com.google.gson.JsonObject();
+                                errorJson.addProperty("packet_id", java.util.UUID.randomUUID().toString());
+                                errorJson.addProperty("packet_type", "RPC");
+                                
+                                com.google.gson.JsonObject errorMetadata = new com.google.gson.JsonObject();
+                                errorMetadata.addProperty("action", "console_command");
+                                errorJson.add("metadata", errorMetadata);
+                                
+                                com.google.gson.JsonObject errorPayload = new com.google.gson.JsonObject();
+                                errorPayload.addProperty("error", "Failed to execute command: " + e.getMessage());
+                                errorJson.add("payload", errorPayload);
+                                
+                                com.hasirciogluhq.easymcadmin.packets.GenericPacket errorResponsePacket = 
+                                    new com.hasirciogluhq.easymcadmin.packets.GenericPacket(errorJson);
+                                
+                                try {
+                                    manager.sendRpcResponsePacket(packet, errorResponsePacket);
+                                } catch (java.io.IOException ioException) {
+                                    EasyMcAdmin.getInstance().getLogger().warning("Failed to send error response: " + ioException.getMessage());
+                                }
+                            }
+                        });
+                    } else {
+                        // EVENT packet - just execute, no response
+                        Bukkit.getServer().getScheduler().runTask(EasyMcAdmin.getInstance(), () -> {
+                            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
+                        });
+                    }
                 }
                 break;
 
@@ -117,17 +184,29 @@ public class TransportHandler implements TransportListener {
 
     @Override
     public void onConnect() {
-        // Send auth packet first, onTransportConnectedAndAuthenticated will be called
+        // Send auth RPC request, onTransportConnectedAndAuthenticated will be called
         // after successful authentication in onAuthSuccess()
         Packet authPacket = new GenericAuthPacket(
                 EasyMcAdmin.getInstance().getConfig().getString("server.token", "1234567890"));
 
         Bukkit.getServer().getScheduler().runTaskLater(EasyMcAdmin.getInstance(), () -> {
             try {
-                manager.sendPacket(authPacket);
-            } catch (IOException e) {
+                // Send RPC request and wait for response
+                manager.sendRpcRequestPacket(authPacket)
+                    .thenAccept(responsePacket -> {
+                        // Handle auth response
+                        onAuthResponse(responsePacket);
+                    })
+                    .exceptionally(throwable -> {
+                        EasyMcAdmin.getInstance().getLogger()
+                                .warning("Auth request failed: " + throwable.getMessage());
+                        onAuthFailure(throwable.getMessage());
+                        return null;
+                    });
+            } catch (Exception e) {
                 EasyMcAdmin.getInstance().getLogger()
                         .warning("Error while sending auth packet: " + e.getMessage());
+                onAuthFailure(e.getMessage());
             }
         }, 6L);
 
