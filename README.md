@@ -5,8 +5,8 @@
 ## What is EasyMcAdmin?
 
 EasyMcAdmin is a next-generation Minecraft server admin plugin  
-for Bukkit/Spigot/Paper that lets you manage your server the modern way.  
-Control players, permissions, console, and more – always securely, easily, and remotely.
+for Bukkit/Spigot/Paper that lets you manage your server in a modern and secure way.  
+Control players, permissions, the console, and more – easily, securely, and remotely.
 
 ## Features
 
@@ -18,7 +18,9 @@ Control players, permissions, console, and more – always securely, easily, and
 - Extensible with your own subcommands
 - Fast, stable, and production-ready
 
-## Installation
+---
+
+## 📦 Installation (Plugin User)
 
 1. Download the latest plugin JAR from [Releases](https://github.com/hasirciogluhq/EasyMcAdmin/releases)
 2. Place `EasyMcAdmin-plugin.jar` in your server's `plugins/` folder
@@ -26,6 +28,81 @@ Control players, permissions, console, and more – always securely, easily, and
 4. Set your token using the command `/<easymcadmin/ema> setToken <your-token-here>`
 5. (Optional) Edit the config at `plugins/EasyMcAdmin/config.yml` if needed
 6. Reload or restart your server to apply any manual config changes
+
+---
+
+## 🛠️ Build & Install (Development/Source)
+
+If you want to build EasyMcAdmin from source, you can do so easily with the provided scripts and Gradle setup.
+
+### Prerequisites
+
+- **Java 17** (required for compatibility)
+- **Gradle 8.5+** (wrapper included, no manual installation needed)
+
+### Quick Install on macOS/Linux
+
+```bash
+# Clone the repository
+git clone https://github.com/hasirciogluhq/EasyMcAdmin.git
+cd EasyMcAdmin/apps/mc-plugin
+
+# Run the build and deploy script (auto-detects Java 17)
+./build.sh
+```
+> The `build.sh` script will:
+> - Check for and use Java 17
+> - Build the project using the Gradle Wrapper
+> - Deploy the plugin JAR to your test server's plugins folder (see deploy task in `build.gradle.kts`)
+
+> **Note about deployment path:**  
+> The deploy script and the `deploy` Gradle task are currently set to copy the JAR to this folder:
+>
+> ```
+> /Users/hasircioglu/mc-server-1/servers/test/plugins
+> ```
+> This is the plugin author's (Hasircioglu's) development server path on macOS and is used here as a default/example.<br>
+> **You should update this deployment path to match your own local test server's `plugins/` folder!**
+> <br>
+> Edit the target folder in the `deploy` task inside [`build.gradle.kts`](./build.gradle.kts).
+
+### Manual Build Steps
+
+You can also use Gradle directly:
+
+```bash
+# (Optional) Ensure JAVA_HOME points to Java 17
+export JAVA_HOME=$(/usr/libexec/java_home -v17)
+
+# Build the plugin JAR (output in `build/libs/`)
+./gradlew build
+
+# Deploy to your defined directory (see below)
+./gradlew deploy
+```
+
+The deployment path can be changed inside the `deploy` task in `build.gradle.kts`.
+
+---
+
+## 🧪 Example Usage
+
+**After installing the plugin JAR:**
+
+1. Start the Minecraft server normally.
+2. Set your panel/server token:
+   ```bash
+   /easymcadmin setToken <your-token>
+   ```
+   Example:
+   ```
+   /easymcadmin setToken f2ab3c4d5e6f70123456789abcdef0123456789abcdef01
+   ```
+
+3. Confirm backend connection in console or in-game.
+4. Type `/easymcadmin help` to see available commands.
+
+---
 
 ## Configuration
 
@@ -63,14 +140,14 @@ There are no other required configuration sections outside of the above. Databas
 
 ## Commands & Permissions
 
-All plugin commands are handled under `/easymcadmin` or `/ema` , using a main command + subcommands system.
+All plugin commands are handled under `/easymcadmin` or `/ema`, using a main command + subcommands system.
 
 ### Example Commands
 
-| Command                         | Permission        | Description                           |
-| ------------------------------- | ----------------- | ------------------------------------- |
-| `/easymcadmin,ema help`             | easymcadmin.use   | Lists available EasyMcAdmin commands  |
-| `/easymcadmin,ema setToken <token>` | easymcadmin.admin | Sets the backend authentication token |
+| Command                             | Permission        | Description                           |
+| ------------------------------------ | ----------------- | ------------------------------------- |
+| `/easymcadmin,ema help`              | easymcadmin.use   | Lists available EasyMcAdmin commands  |
+| `/easymcadmin,ema setToken <token>`  | easymcadmin.admin | Sets the backend authentication token |
 
 #### `/easymcadmin setToken` usage
 
@@ -99,14 +176,14 @@ Give yourself admin rights:
     ```java
     registerSubCommand("setToken", new SetTokenSubCommand(plugin));
     ```
-- Each subcommand (`SetTokenSubCommand`, etc.) implements:
-  ```java
-  @Override
-  public String getPermission() { return "easymcadmin.admin"; }
-  ```
+- Each subcommand (such as `SetTokenSubCommand`) implements:
+    ```java
+    @Override
+    public String getPermission() { return "easymcadmin.admin"; }
+    ```
 - The main command ensures that only users with permission can access each subcommand.
 
-All config reading/writing (besides server.id/server.token and transport) is managed internally, so you don't need to add additional configuration.
+All config reading/writing (besides `server.id`/`server.token` and `transport`) is managed internally, so you don't need to add additional configuration.
 
 ## Usage
 
@@ -115,7 +192,7 @@ All subcommands provide usage info and permission checks automatically.
 
 - **LuckPerms integration:**  
   All permission/group changes fully respect and work with LuckPerms.
-- **Console output & event tracking**:  
+- **Console output & event tracking:**  
   Managed automatically by the plugin backend logic, with no config needed.
 
 ## Contributing
