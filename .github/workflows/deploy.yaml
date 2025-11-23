@@ -1,0 +1,21 @@
+on:
+  push:
+    branches:
+      - main
+      - development
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kaynak kodu checkout et
+        uses: actions/checkout@v3
+
+      - name: Java 17 kurulumu yap
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Maven ile derle
+        run: mvn clean package

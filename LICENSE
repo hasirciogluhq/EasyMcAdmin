@@ -1,0 +1,36 @@
+LICENSE
+
+(EasyMcAdmin 2025)
+
+This program is free software.
+You can redistribute it and or modify it under the terms of the GNU Affero General Public License version 3 published by the Free Software Foundation.
+
+This program is distributed in the hope that it will be useful but without any warranty.
+See the GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License along with this program.
+If not, see: https://www.gnu.org/licenses/
+
+AGPL Additional Permissions
+Commercial Exception
+This exception applies only to this repository named EasyMcAdmin and does not extend to other projects unless explicitly granted.
+
+Permission is granted to HasirciogluHQ and PhineUp LLC to use this software in closed source commercial products and services including but not limited to web dashboards, management panels, hosting platforms, or SaaS offerings.
+
+Third parties may use, modify and distribute this software under the standard AGPLv3 terms but are not permitted to:
+
+use this software or modified versions in any commercial product or service
+
+integrate this software into paid hosting panels, dashboards, reseller systems or SaaS tools
+
+sell or license modified or unmodified versions of this software
+
+distribute this software in a way that competes with EasyMcAdmin, HasirciogluHQ or PhineUp LLC
+
+Public Minecraft servers may use EasyMcAdmin for free as long as they do not sell the software itself or include it in a commercial panel, toolkit or hosting service.
+
+Any derivative work that interacts with users over a network must follow AGPLv3 and publish its source code.
+
+Use of the EasyMcAdmin name, logos, or branding is not permitted without written permission from HasirciogluHQ.
+
+End of License.
