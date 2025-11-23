@@ -2,9 +2,11 @@ package com.hasirciogluhq.easymcadmin.transport;
 
 import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
 import com.hasirciogluhq.easymcadmin.packets.Packet;
+import com.hasirciogluhq.easymcadmin.packets.PacketType;
 import com.hasirciogluhq.easymcadmin.packets.auth.GenericAuthPacket;
 import com.hasirciogluhq.easymcadmin.packets.auth.GenericAuthPacketResponse;
 import com.hasirciogluhq.easymcadmin.packets.economy.EconomyConfigPacket;
+import com.hasirciogluhq.easymcadmin.rpc.RpcStore;
 
 import org.bukkit.Bukkit;
 
@@ -20,6 +22,17 @@ public class TransportHandler implements TransportListener {
 
     @Override
     public void onPacket(Packet packet) {
+        // Handle RPC packets first (if authenticated)
+        if (packet.getPacketType() == PacketType.RPC) {
+            try {
+                RpcStore.getRpcStore().handlePacket(packet);
+                return; // RPC handled, don't process as regular packet
+            } catch (Exception e) {
+                EasyMcAdmin.getInstance().getLogger().warning("Failed to handle RPC packet: " + e.getMessage());
+                // Continue to regular packet handling if RPC handling fails
+            }
+        }
+
         String action = packet.getMetadata().has("action")
                 ? packet.getMetadata().get("action").getAsString()
                 : "";
@@ -136,11 +149,12 @@ public class TransportHandler implements TransportListener {
     private void handleEconomyConfig(Packet packet) {
         EconomyConfigPacket economyConfigPacket = new EconomyConfigPacket(packet);
         com.google.gson.JsonObject economyConfig = economyConfigPacket.getEconomyConfig();
-        
+
         // Update economy manager with new config
         if (EasyMcAdmin.getInstance().getEconomyManager() != null) {
             EasyMcAdmin.getInstance().getEconomyManager().updateEconomyConfig(economyConfig);
-            // EasyMcAdmin.getInstance().getLogger().info("Economy config updated from backend");
+            // EasyMcAdmin.getInstance().getLogger().info("Economy config updated from
+            // backend");
         }
     }
 }

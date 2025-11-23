@@ -4,6 +4,7 @@ import com.hasirciogluhq.easymcadmin.commands.MainCommand;
 import com.hasirciogluhq.easymcadmin.economy.EconomyManager;
 import com.hasirciogluhq.easymcadmin.metrics.MetricsScheduler;
 import com.hasirciogluhq.easymcadmin.packets.Packet;
+import com.hasirciogluhq.easymcadmin.rpc.RpcStore;
 import com.hasirciogluhq.easymcadmin.transport.TransportHandler;
 import com.hasirciogluhq.easymcadmin.transport.TransportInterface;
 import com.hasirciogluhq.easymcadmin.transport.TransportManager;
@@ -52,6 +53,9 @@ public class EasyMcAdmin extends JavaPlugin {
             saveConfig();
             getLogger().info("Generated new server ID: " + serverId);
         }
+
+        // Initialize RPC Store
+        RpcStore.initRpc().start(this);
 
         // Initialize Transport Manager
         transport = new TcpTransport(this, getConfig().getString("transport.host", "localhost"),
@@ -117,6 +121,13 @@ public class EasyMcAdmin extends JavaPlugin {
         // Stop metrics scheduler
         if (metricsScheduler != null) {
             metricsScheduler.stop();
+        }
+
+        // Stop RPC store cleanup task
+        try {
+            RpcStore.getRpcStore().stop();
+        } catch (Exception e) {
+            // Ignore if not initialized
         }
 
         // Disconnect Transport
