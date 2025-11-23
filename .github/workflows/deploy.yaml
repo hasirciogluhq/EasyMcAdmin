@@ -23,8 +23,13 @@ jobs:
           java-version: 17
           cache: gradle
 
+      - name: Rebuild Gradle Wrapper (fix missing gradle-wrapper.jar)
+        run: |
+          echo "Regenerating Gradle wrapper..."
+          gradle wrapper --gradle-version 8.5
+
       - name: Make Gradle wrapper executable
-        run: chmod +x ./gradlew
+        run: chmod +x gradlew
 
       - name: Build Shadow JAR
         run: ./gradlew clean shadowJar --no-daemon
