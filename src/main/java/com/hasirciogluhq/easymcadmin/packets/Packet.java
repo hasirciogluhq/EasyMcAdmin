@@ -42,6 +42,28 @@ public abstract class Packet {
         return json;
     }
 
+    public boolean IsRpc() {
+        return packetType.equals(PacketType.RPC);
+    }
+
+    public boolean isRpcRequest() {
+        return packetType == PacketType.RPC &&
+                (!metadata.has("rpc_id") || metadata.get("rpc_id").getAsString().isEmpty());
+    }
+
+    public boolean isRpcResponse() {
+        return packetType == PacketType.RPC &&
+                (metadata.has("rpc_id") && !metadata.get("rpc_id").getAsString().isEmpty());
+    }
+
+    public boolean IsEvent() {
+        return packetType.equals(PacketType.EVENT);
+    }
+
+    public String getAction() {
+        return metadata.has("action") ? metadata.get("action").getAsString() : "";
+    }
+
     /**
      * Get packet ID
      * 
