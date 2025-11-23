@@ -1,0 +1,76 @@
+name: "Bug Report"
+description: "Report an unexpected behavior, crash, or incorrect output in EasyMcAdmin."
+title: "[Bug]: "
+labels: ["bug"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug!  
+        Please fill out the information below so we can fix it quickly.
+
+  - type: input
+    id: summary
+    attributes:
+      label: "Short Summary"
+      description: "Briefly describe the issue."
+      placeholder: "Inventory sync not updating..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Detailed Description"
+      description: "Explain the bug in detail. What happened? What did you expect instead?"
+      placeholder: "Steps to reproduce the issue..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: "Steps to Reproduce"
+      description: "List the exact steps needed to trigger the bug."
+      placeholder: |
+        1. Start server  
+        2. Run /ema reload  
+        3. Error appears
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: "Plugin / Server Version"
+      description: "Which version of EasyMcAdmin or Paper/Spigot are you using?"
+      placeholder: "EasyMcAdmin v1.0.0 / Paper 1.21.1"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Logs / Errors"
+      description: "Paste any relevant error logs. Please redact sensitive information."
+      render: bash
+      placeholder: "Stack traces or console output here..."
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: "Environment Details"
+      description: "Your OS, Java version, hosting provider, Docker/K8s details if applicable."
+      placeholder: "Ubuntu 22.04, Java 17, Docker container, etc."
+
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: "Checklist"
+      options:
+        - label: "I have searched for existing issues"
+          required: true
+        - label: "I have provided all necessary details"
+          required: true

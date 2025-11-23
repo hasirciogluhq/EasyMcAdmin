@@ -1,0 +1,56 @@
+name: "Feature Request"
+description: "Suggest a new feature or improvement for EasyMcAdmin."
+title: "[Feature]: "
+labels: ["enhancement"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for your interest in improving EasyMcAdmin!  
+        Let us know what you'd like to see added.
+
+  - type: input
+    id: summary
+    attributes:
+      label: "Feature Summary"
+      description: "Brief description of the requested feature."
+      placeholder: "Add support for multiple proxy servers..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Detailed Explanation"
+      description: "Describe the feature, how it should work, and why it’s useful."
+      placeholder: "This feature will allow..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: usecase
+    attributes:
+      label: "Use Case / Motivation"
+      description: "Why do you need this feature? What problem does it solve?"
+      placeholder: "My server needs to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Alternatives Considered"
+      description: "List alternative approaches or existing plugins you tried."
+      placeholder: "I tried plugin XYZ but..."
+
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: "Checklist"
+      options:
+        - label: "This is not a duplicate request"
+          required: true
+        - label: "I provided clear reasoning for the feature"
+          required: true

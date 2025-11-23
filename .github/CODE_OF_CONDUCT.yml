@@ -1,0 +1,68 @@
+name: "EasyMcAdmin Code of Conduct"
+version: 1.0.0
+owner:
+  organization: "HasirciogluHQ / PhineUp LLC"
+  contact: "support@hasirciogluhq.com"
+
+purpose: >
+  EasyMcAdmin is an open-source project welcoming contributors from all backgrounds.
+  This Code of Conduct defines expected behavior, unacceptable behavior, and how
+  violations are handled. We aim to foster a respectful, productive, and inclusive environment.
+
+standards:
+  expected_behavior:
+    - "Be respectful, constructive, and supportive in all interactions."
+    - "Use welcoming and inclusive language."
+    - "Value the perspectives of others, even when they differ from your own."
+    - "Accept feedback gracefully and offer it with kindness."
+    - "Collaborate in good faith towards shared project goals."
+
+  unacceptable_behavior:
+    - "Harassment, discrimination, or personal attacks."
+    - "Trolling, insults, or derogatory comments."
+    - "Publishing private information without consent."
+    - "Aggressive, hostile, or uncooperative communication."
+    - "Any behavior that disrupts project activities or community health."
+
+responsibilities:
+  maintainers:
+    - "Review contributions and community interactions fairly and respectfully."
+    - "Enforce this Code of Conduct consistently."
+    - "Take action against unacceptable behavior when observed or reported."
+    - "Communicate moderation decisions transparently when appropriate."
+
+scope:
+  applies_to:
+    - "GitHub repositories"
+    - "Pull Requests, Issues, Discussions"
+    - "Community chat channels (Discord, forum, etc)"
+    - "Public interactions related to the EasyMcAdmin project"
+  notes: >
+    This Code of Conduct applies equally to maintainers, contributors, and all community members.
+
+reporting:
+  instructions: >
+    If you experience or observe violations of this Code of Conduct, report them privately.
+  channels:
+    email: "security@hasirciogluhq.com"
+    github_security: "https://github.com/hasirciogluhq/EasyMcAdmin/security/advisories"
+  confidentiality:
+    - "Reports are handled discreetly and confidentially."
+    - "Retaliation against reporters is strictly prohibited."
+
+enforcement:
+  actions:
+    - "Warning for minor violations."
+    - "Temporary communication or contribution restrictions."
+    - "Permanent ban from participating in the project if necessary."
+  criteria:
+    - "Severity of violation"
+    - "Frequency or repeated occurrences"
+    - "Impact on community health"
+    - "Intent and accountability"
+
+attribution:
+  base_framework: "Adapted from the Contributor Covenant v2.1."
+  url: "https://www.contributor-covenant.org/"
+
+license: "Licensed under the CC BY 4.0."

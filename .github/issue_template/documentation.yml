@@ -1,0 +1,33 @@
+name: "Documentation Improvement"
+description: "Request fixes or updates to EasyMcAdmin documentation."
+title: "[Docs]: "
+labels: ["documentation"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Help us improve the project by reporting unclear or missing documentation.
+
+  - type: input
+    id: area
+    attributes:
+      label: "Which section needs improvement?"
+      placeholder: "Installation / config.yml / RCON setup"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Describe the issue"
+      placeholder: "The installation steps are unclear for Docker..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: "Suggested Fix or Improvement"
+      placeholder: "Clarify the following steps..."
