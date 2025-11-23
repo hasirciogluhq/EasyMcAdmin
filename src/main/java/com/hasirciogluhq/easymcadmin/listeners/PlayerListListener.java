@@ -295,8 +295,7 @@ public class PlayerListListener implements Listener {
             return;
         }
 
-
-        fullSync = true;
+        // fullSync = true;
         UUID playerUUID = player.getUniqueId();
 
         // Serialize current inventory and ender chest
