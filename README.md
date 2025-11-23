@@ -1,103 +1,143 @@
-# EasyMcAdmin
+# EasyMcAdmin Plugin
 
-> A powerful, modular admin panel toolkit for Minecraft servers — built for developers, admins and communities.
+> Modern, open-source Minecraft server management – easy and powerful.
 
-## 🚀 What is EasyMcAdmin?
+## What is EasyMcAdmin?
 
-EasyMcAdmin is an extensible admin panel and plugin suite crafted to simplify server management for Minecraft.  
-Whether you're running a public server with thousands of players or a niche private community, EasyMcAdmin gives you the tools to build dashboards, manage players, integrate permissions, handle RCON commands and much more — all under one unified roof.
+EasyMcAdmin is a next-generation Minecraft server admin plugin  
+for Bukkit/Spigot/Paper that lets you manage your server the modern way.  
+Control players, permissions, console, and more – always securely, easily, and remotely.
 
-## 🔧 Features
+## Features
 
-- Modular plugin architecture (works with Bukkit/Spigot/Paper)  
-- Player & permissions management (LuckPerms support)  
-- Real-time RCON / remote console support  
-- Dashboard UI (web) for staff & moderators  
-- Event hooks, custom commands and extension points  
-- Designed for scalability (microservices friendly, monorepo architecture)  
-- Plugin history and change tracking preserved  
+- Advanced admin panel integration for Bukkit / Spigot / Paper servers
+- Player management & moderation commands
+- Full LuckPerms support for managing ranks/permissions
+- Secure, real-time remote console access (RCON alternative)
+- Simple configuration via `config.yml` (see below)
+- Extensible with your own subcommands
+- Fast, stable, and production-ready
 
-## 🧱 Architecture Overview
+## Installation
 
-```
+1. Download the latest plugin JAR from [Releases](https://github.com/hasirciogluhq/EasyMcAdmin/releases)
+2. Place `EasyMcAdmin-plugin.jar` in your server's `plugins/` folder
+3. Start your server to generate the config files
+4. Set your token using the command `/<easymcadmin/ema> setToken <your-token-here>`
+5. (Optional) Edit the config at `plugins/EasyMcAdmin/config.yml` if needed
+6. Reload or restart your server to apply any manual config changes
 
-/
-├─ apps/
-│   ├─ plugin/        ← Minecraft plugin source
-│   └─ dashboard/     ← Web admin panel (Next.js / TS)
-├─ packages/
-│   └─ shared/        ← Shared utilities, types, services
-├─ infra/
-│   └─ k8s/          ← Kubernetes manifests & deployment configs
-└─ README.md
+## Configuration
 
-````
-
-This monorepo structure allows you to share code, maintain versioned dependencies and deploy each part independently.
-
-## 📦 Installation
-
-### Plugin (Minecraft server)
-1. Build the plugin: `./gradlew :apps:plugin:build`  
-2. Copy `build/libs/EasyMcAdmin-plugin.jar` to your server’s `plugins/` directory  
-3. Restart the server  
-4. Configure `config.yml` under `plugins/EasyMcAdmin` folder  
-
-### Dashboard (Web Panel)
-1. `cd apps/dashboard`  
-2. Install dependencies: `npm install`  
-3. Configure `.env` (for example `MONGO_URI`, `SESSION_SECRET`, `RCON_HOST`, `RCON_PORT`)  
-4. Run dev: `npm run dev` or build for production: `npm run build && npm run start`  
-
-## 🛠 Configuration
-
-Configure the plugin by editing `plugins/EasyMcAdmin/config.yml`. Example key settings:
+Basic `config.yml` example:
 
 ```yaml
-database:
-  host: localhost
-  port: 27017
-  name: easy_mca
+# Core configuration
 
-rcon:
-  host: 127.0.0.1
-  port: 25575
-  password: yourpassword
+server:
+  id: "" # Automatically generated on first start, do not change
+  token: "" # Set via in-game command ONLY
 
-dashboard:
+transport:
   enabled: true
-  url: http://your-panel.domain
-````
+  host: "localhost"
+  port: 8798
+```
 
-## 🧑‍🤝‍🧑 Contribution
+- `server.id`: Unique server ID. Generated and managed automatically.
+- `server.token`: Authentication token. **Set using the command `/easymcadmin setToken <token>` instead of editing manually.**
+- `transport`: TCP communication config – defaults work out of the box.
 
-We welcome contributions! Please follow these steps:
+**Note:**  
+There are no other required configuration sections outside of the above. Database/web panel config is not needed in the plugin, only on the backend panel.
 
-1. Fork the repo
-2. Create a branch: `git checkout -b feature/my-awesome-feature`
-3. Make your changes (code, docs, tests)
-4. Run tests and verify everything works
-5. Submit a Pull Request
-6. One of the maintainers will review your changes
+### How authentication works
 
-Please adhere to the coding standards (TypeScript / Go / Java) and the architecture guidelines.
+- On first boot, a unique `server.id` is generated and stored if not present:
+  ```java
+  serverId = getConfig().getString("server.id", "");
+  // If empty, generate and save to config
+  ```
+- You must set your authentication token via command (`/easymcadmin setToken`).  
+  This securely writes the token to `config.yml` and triggers a connection to your backend or dashboard.
 
-## 🎯 Roadmap
+## Commands & Permissions
 
-* [ ] Dashboard plugin marketplace
-* [ ] Webhooks for third-party integrations
-* [ ] Multi-server clustering support
-* [ ] Analytics & live player metrics
-* [ ] Official documentation site
+All plugin commands are handled under `/easymcadmin` or `/ema` , using a main command + subcommands system.
 
-## 📄 License
+### Example Commands
 
-This project is licensed under the **GNU Affero General Public License v3.0** with an additional Commercial Exception — see [LICENSE](LICENSE) file for full details.
+| Command                         | Permission        | Description                           |
+| ------------------------------- | ----------------- | ------------------------------------- |
+| `/easymcadmin,ema help`             | easymcadmin.use   | Lists available EasyMcAdmin commands  |
+| `/easymcadmin,ema setToken <token>` | easymcadmin.admin | Sets the backend authentication token |
 
-## 🧾 Branding & Trademark
+#### `/easymcadmin setToken` usage
 
-The name **EasyMcAdmin** and associated logos are trademarks of HasirciogluHQ / PhineUp LLC. No unauthorized use without written permission.
+Sets the backend/dashboard authentication token for your server.
+
+```
+/easymcadmin setToken f2ab3c4d5e6f70123456789abcdef0123456789abcdef01
+```
+
+- **Token must be at least 32 characters**
+- Updates the config and immediately attempts a secure connection
+- Only users with `easymcadmin.admin` permission can use this command
+
+#### Example Permission Setup (LuckPerms)
+
+Give yourself admin rights:
+
+```
+/lp user YourName permission set easymcadmin.admin true
+```
+
+## Command System Overview
+
+- **Main command:** `/easymcadmin`
+  - Subcommands registered using a system like:
+    ```java
+    registerSubCommand("setToken", new SetTokenSubCommand(plugin));
+    ```
+- Each subcommand (`SetTokenSubCommand`, etc.) implements:
+  ```java
+  @Override
+  public String getPermission() { return "easymcadmin.admin"; }
+  ```
+- The main command ensures that only users with permission can access each subcommand.
+
+All config reading/writing (besides server.id/server.token and transport) is managed internally, so you don't need to add additional configuration.
+
+## Usage
+
+After setup and configuring your token, use `/easymcadmin help` for a list of features and commands.  
+All subcommands provide usage info and permission checks automatically.
+
+- **LuckPerms integration:**  
+  All permission/group changes fully respect and work with LuckPerms.
+- **Console output & event tracking**:  
+  Managed automatically by the plugin backend logic, with no config needed.
+
+## Contributing
+
+Contributions are welcome!
+
+- Open issues or request features on GitHub
+- Submit Pull Requests for changes or enhancements
+
+See [CONTRIBUTING.md](./.github/CONTRIBUTING.md) for project guidelines.
+
+## License
+
+This project is licensed under the **GNU Affero General Public License v3.0 (with Commercial Exception)**.  
+See [LICENSE](./LICENSE) for more information.
+
+## Branding & Credits
+
+**EasyMcAdmin** is a trademark of HasirciogluHQ / PhineUp LLC.  
+You may not use the name or logo without permission.
 
 ---
 
-Thank you for using EasyMcAdmin. Let’s build the next-gen Minecraft admin ecosystem together!
+Thank you for choosing EasyMcAdmin!  
+If you find it useful, please star the repository or contribute ✨
