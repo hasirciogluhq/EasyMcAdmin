@@ -51,5 +51,17 @@ public class GenericPacket extends Packet {
             : new JsonObject();
         this.timestamp = json.has("timestamp") ? json.get("timestamp").getAsLong() : System.currentTimeMillis() / 1000;
     }
+    
+    /**
+     * Create a GenericPacket with explicit parameters
+     * 
+     * @param packetId Packet ID
+     * @param packetType Packet type (EVENT or RPC)
+     * @param metadata Metadata object
+     * @param payload Payload object
+     */
+    public GenericPacket(String packetId, PacketType packetType, JsonObject metadata, JsonObject payload) {
+        super(packetId, packetType, metadata, payload);
+    }
 }
 
