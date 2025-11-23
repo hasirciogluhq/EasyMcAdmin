@@ -130,17 +130,17 @@ transport:
   <li><b>transport:</b>  📡 TCP config (defaults work out of the box)</li>
 </ul>
 
-> 💡 <i>No SQL/web config required; plugin is plug & play!</i>
+No SQL or web config needed; just install the plugin and it's ready to use!
 
-### 🔒 How authentication works
+### How authentication works
 
-- 🆕 On first boot, a <b>unique id</b> is generated:
-  <pre><code>serverId = getConfig().getString("server.id", "");
-// If empty, generate and save
-</code></pre>
-- 🔑 <b>You set your token via</b> command <code>/easymcadmin setToken</code> (never edit manually!)
+- On the first start, a unique server id is generated automatically:
+  ```
+  serverId = getConfig().getString("server.id", "");
+  // If empty, generate and save
+  ```
+- Set your token only using the `/easymcadmin setToken` command in-game (do not edit manually!)
 
----
 
 ## ⌨️ Commands & Permissions
 
@@ -169,19 +169,18 @@ All actions use <strong><code>/easymcadmin</code></strong> (or <strong><code>/em
 
 ## 🧠 Command System Overview
 
-- 🏷️ <b>Main:</b> <code>/easymcadmin</code>
-   <ul>
-     <li>Subcommands registered like:<br>
-    <pre><code>registerSubCommand("setToken", new SetTokenSubCommand(plugin));</code></pre></li>
-     <li>With per-command permissions:<br>
-    <pre><code>
-@Override
-public String getPermission() { return "easymcadmin.admin"; }
-    </code></pre>
-     </li>
-     <li>Main command <b>checks permissions</b> automatically ✅</li>
-   </ul>
- - <i>All config is managed by the plugin; just set token!</i>
+- Ana komut: `/easymcadmin`
+- Alt komutlar şu şekilde eklenir:
+  ```
+  registerSubCommand("setToken", new SetTokenSubCommand(plugin));
+  ```
+- Her alt komut için izin tanımlanabilir:
+  ```java
+  @Override
+  public String getPermission() { return "easymcadmin.admin"; }
+  ```
+- Ana komut otomatik olarak izinleri kontrol eder.
+- Tüm yapılandırma eklenti tarafından yönetilir; sadece token'ı girmeniz yeterlidir!
 
 ---
 
