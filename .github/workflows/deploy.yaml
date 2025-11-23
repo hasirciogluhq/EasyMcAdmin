@@ -23,4 +23,4 @@ jobs:
 
       - name: Build & deploy with build.sh
         run: ./build.sh
-        working-directory: ./apps/mc-plugin
+        working-directory: ./
