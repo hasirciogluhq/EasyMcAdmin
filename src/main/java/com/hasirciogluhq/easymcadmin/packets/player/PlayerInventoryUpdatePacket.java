@@ -12,12 +12,12 @@ import java.util.UUID;
  */
 public class PlayerInventoryUpdatePacket extends Packet {
     
-    public PlayerInventoryUpdatePacket(String inventoryHash, String enderChestHash, boolean fullSync, JsonObject playerData) {
+    public PlayerInventoryUpdatePacket(String inventoryHash, String enderChestHash, boolean fullSync, JsonObject inventoryData) {
         super(
             UUID.randomUUID().toString(),
             PacketType.EVENT,
             createMetadata(inventoryHash, enderChestHash, fullSync),
-            createPayload(playerData)
+            createPayload(inventoryData)
         );
     }
     
@@ -34,10 +34,8 @@ public class PlayerInventoryUpdatePacket extends Packet {
         return metadata;
     }
     
-    private static JsonObject createPayload(JsonObject playerData) {
-        JsonObject payload = new JsonObject();
-        payload.add("player", playerData);
-        return payload;
+    private static JsonObject createPayload(JsonObject inventoryData) {
+        return inventoryData;
     }
 }
 

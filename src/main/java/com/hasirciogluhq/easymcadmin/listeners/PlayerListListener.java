@@ -295,23 +295,22 @@ public class PlayerListListener implements Listener {
             return;
         }
 
-        // override full_sync
-        fullSync = true;
 
+        fullSync = true;
         UUID playerUUID = player.getUniqueId();
 
         // Serialize current inventory and ender chest
-        JsonArray currentInventory = null;
-        JsonArray currentEnderChest = null;
+        JsonArray currentSerializedInventory = null;
+        JsonArray currentSerializedEnderChest = null;
 
         PlayerInventory inventory = player.getInventory();
         if (inventory != null) {
-            currentInventory = InventorySerializer.serializeInventory(inventory);
+            currentSerializedInventory = InventorySerializer.serializeInventory(inventory);
         }
 
         org.bukkit.inventory.Inventory enderChest = player.getEnderChest();
         if (enderChest != null) {
-            currentEnderChest = InventorySerializer.serializeEnderChest(enderChest);
+            currentSerializedEnderChest = InventorySerializer.serializeEnderChest(enderChest);
         }
 
         // Calculate hashes for both inventory and ender chest
@@ -319,25 +318,25 @@ public class PlayerListListener implements Listener {
         String enderChestHash = InventorySerializer.calculateEnderChestHash(player.getEnderChest());
 
         try {
-            JsonObject playerObj = new JsonObject();
-            playerObj.addProperty("uuid", playerUUID.toString());
+            JsonObject inventoryData = new JsonObject();
+            inventoryData.addProperty("player_uuid", playerUUID.toString());
 
             if (fullSync) {
                 // Full sync: send complete inventory and ender chest
-                if (currentInventory != null) {
-                    playerObj.add("inventory", currentInventory);
+                if (currentSerializedInventory != null) {
+                    inventoryData.add("inventory", currentSerializedInventory);
                 }
-                if (currentEnderChest != null) {
-                    playerObj.add("ender_chest", currentEnderChest);
+                if (currentSerializedEnderChest != null) {
+                    inventoryData.add("ender_chest", currentSerializedEnderChest);
                 }
 
                 // Update stored states
-                if (currentInventory != null) {
-                    previousInventories.put(playerUUID, currentInventory);
+                if (currentSerializedInventory != null) {
+                    previousInventories.put(playerUUID, currentSerializedInventory);
                     previousInventoryHashes.put(playerUUID, inventoryHash);
                 }
-                if (currentEnderChest != null) {
-                    previousEnderChests.put(playerUUID, currentEnderChest);
+                if (currentSerializedEnderChest != null) {
+                    previousEnderChests.put(playerUUID, currentSerializedEnderChest);
                     previousEnderChestHashes.put(playerUUID, enderChestHash);
                 }
             } else {
@@ -350,29 +349,33 @@ public class PlayerListListener implements Listener {
                 // Check if inventory hash changed
                 boolean inventoryChanged = !inventoryHash
                         .equals(previousInventoryHash != null ? previousInventoryHash : "");
-                if (inventoryChanged && currentInventory != null) {
-                    JsonArray inventoryDiff = InventorySerializer.calculateDiff(previousInventory, currentInventory);
-                    playerObj.add("inventory", inventoryDiff);
+                if (inventoryChanged && currentSerializedInventory != null) {
+                    JsonArray inventoryDiff = InventorySerializer.calculateDiff(previousInventory,
+                            currentSerializedInventory);
+                    inventoryData.add("inventory", inventoryDiff);
+                    inventoryData.addProperty("inventory_prev_hash", previousInventoryHash);
 
                     // Update stored state
-                    previousInventories.put(playerUUID, currentInventory);
+                    previousInventories.put(playerUUID, currentSerializedInventory);
                     previousInventoryHashes.put(playerUUID, inventoryHash);
                 }
 
                 // Check if ender chest hash changed
                 boolean enderChestChanged = !enderChestHash
                         .equals(previousEnderChestHash != null ? previousEnderChestHash : "");
-                if (enderChestChanged && currentEnderChest != null) {
-                    JsonArray enderChestDiff = InventorySerializer.calculateDiff(previousEnderChest, currentEnderChest);
-                    playerObj.add("ender_chest", enderChestDiff);
+                if (enderChestChanged && currentSerializedEnderChest != null) {
+                    JsonArray enderChestDiff = InventorySerializer.calculateDiff(previousEnderChest,
+                            currentSerializedEnderChest);
+                    inventoryData.add("ender_chest", enderChestDiff);
+                    inventoryData.addProperty("ender_chest_prev_hash", previousEnderChestHash);
 
                     // Update stored state
-                    previousEnderChests.put(playerUUID, currentEnderChest);
+                    previousEnderChests.put(playerUUID, currentSerializedEnderChest);
                     previousEnderChestHashes.put(playerUUID, enderChestHash);
                 }
             }
 
-            Packet packet = new PlayerInventoryUpdatePacket(inventoryHash, enderChestHash, fullSync, playerObj);
+            Packet packet = new PlayerInventoryUpdatePacket(inventoryHash, enderChestHash, fullSync, inventoryData);
             plugin.getTransportManager().sendPacket(packet);
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to send player inventory update: " + e.getMessage());
@@ -420,7 +423,7 @@ public class PlayerListListener implements Listener {
         try {
             // Get all balances from enabled providers
             List<EconomyManager.PlayerBalanceEntry> balances = economyManager.getPlayerBalances(player);
-            
+
             if (balances.isEmpty()) {
                 return;
             }
@@ -470,7 +473,7 @@ public class PlayerListListener implements Listener {
         try {
             // Get all balances from enabled providers
             List<EconomyManager.PlayerBalanceEntry> balances = economyManager.getPlayerBalances(offlinePlayer);
-            
+
             if (balances.isEmpty()) {
                 return;
             }
@@ -478,7 +481,8 @@ public class PlayerListListener implements Listener {
             // Create player balance data object
             JsonObject playerBalanceData = new JsonObject();
             playerBalanceData.addProperty("uuid", offlinePlayer.getUniqueId().toString());
-            playerBalanceData.addProperty("username", offlinePlayer.getName() != null ? offlinePlayer.getName() : "Unknown");
+            playerBalanceData.addProperty("username",
+                    offlinePlayer.getName() != null ? offlinePlayer.getName() : "Unknown");
             playerBalanceData.addProperty("online", false);
 
             // Add balances array
@@ -604,123 +608,127 @@ public class PlayerListListener implements Listener {
         }
     }
 
-
-
     // ============================================================================
     // HELPER FUNCTIONS - Vault Integration
     // ============================================================================
     // TODO: Vault integration methods are temporarily commented out
-    // Economy balance and groups will be handled separately via player_balances table
+    // Economy balance and groups will be handled separately via player_balances
+    // table
     // These methods are kept for future use if needed
-    
+
     // /**
-    //  * Get player balance from economy plugin
-    //  * 
-    //  * @param player Player to get balance for
-    //  * @return Balance amount, or null if economy is not available
-    //  */
+    // * Get player balance from economy plugin
+    // *
+    // * @param player Player to get balance for
+    // * @return Balance amount, or null if economy is not available
+    // */
     // private Double getPlayerBalance(OfflinePlayer player) {
-    //     if (economy == null || player == null) {
-    //         return null;
-    //     }
-    //     try {
-    //         return economy.getBalance(player);
-    //     } catch (Exception e) {
-    //         plugin.getLogger().warning("Failed to get balance for player " + player.getName() + ": " + e.getMessage());
-    //         return null;
-    //     }
+    // if (economy == null || player == null) {
+    // return null;
     // }
-    // 
+    // try {
+    // return economy.getBalance(player);
+    // } catch (Exception e) {
+    // plugin.getLogger().warning("Failed to get balance for player " +
+    // player.getName() + ": " + e.getMessage());
+    // return null;
+    // }
+    // }
+    //
     // /**
-    //  * Get currency name from economy plugin
-    //  * 
-    //  * @return Currency name, or null if economy is not available
-    //  */
+    // * Get currency name from economy plugin
+    // *
+    // * @return Currency name, or null if economy is not available
+    // */
     // private String getCurrencyName() {
-    //     if (economy == null) {
-    //         return null;
-    //     }
-    //     try {
-    //         return economy.currencyNameSingular();
-    //     } catch (Exception e) {
-    //         return null;
-    //     }
+    // if (economy == null) {
+    // return null;
     // }
-    // 
+    // try {
+    // return economy.currencyNameSingular();
+    // } catch (Exception e) {
+    // return null;
+    // }
+    // }
+    //
     // /**
-    //  * Get player's primary group (rank)
-    //  * 
-    //  * @param player Player to get group for
-    //  * @return Primary group name, or null if permission plugin is not available
-    //  */
+    // * Get player's primary group (rank)
+    // *
+    // * @param player Player to get group for
+    // * @return Primary group name, or null if permission plugin is not available
+    // */
     // private String getPlayerPrimaryGroup(Player player) {
-    //     if (permission == null || player == null) {
-    //         return null;
-    //     }
-    //     try {
-    //         String world = player.getWorld() != null ? player.getWorld().getName() : null;
-    //         String group = permission.getPrimaryGroup(world, player);
-    //         return group != null && !group.isEmpty() ? group : null;
-    //     } catch (Exception e) {
-    //         plugin.getLogger().warning("Failed to get primary group for player " + player.getName() + ": " + e.getMessage());
-    //         return null;
-    //     }
+    // if (permission == null || player == null) {
+    // return null;
     // }
-    // 
+    // try {
+    // String world = player.getWorld() != null ? player.getWorld().getName() :
+    // null;
+    // String group = permission.getPrimaryGroup(world, player);
+    // return group != null && !group.isEmpty() ? group : null;
+    // } catch (Exception e) {
+    // plugin.getLogger().warning("Failed to get primary group for player " +
+    // player.getName() + ": " + e.getMessage());
+    // return null;
+    // }
+    // }
+    //
     // /**
-    //  * Get all player groups (including ranks)
-    //  * 
-    //  * @param player Player to get groups for
-    //  * @return Array of group names, or null if permission plugin is not available
-    //  */
+    // * Get all player groups (including ranks)
+    // *
+    // * @param player Player to get groups for
+    // * @return Array of group names, or null if permission plugin is not available
+    // */
     // private String[] getPlayerGroups(Player player) {
-    //     if (permission == null || player == null) {
-    //         return null;
-    //     }
-    //     try {
-    //         String world = player.getWorld() != null ? player.getWorld().getName() : null;
-    //         String[] groups = permission.getPlayerGroups(world, player);
-    //         return groups != null && groups.length > 0 ? groups : null;
-    //     } catch (Exception e) {
-    //         plugin.getLogger().warning("Failed to get groups for player " + player.getName() + ": " + e.getMessage());
-    //         return null;
-    //     }
+    // if (permission == null || player == null) {
+    // return null;
     // }
-    // 
+    // try {
+    // String world = player.getWorld() != null ? player.getWorld().getName() :
+    // null;
+    // String[] groups = permission.getPlayerGroups(world, player);
+    // return groups != null && groups.length > 0 ? groups : null;
+    // } catch (Exception e) {
+    // plugin.getLogger().warning("Failed to get groups for player " +
+    // player.getName() + ": " + e.getMessage());
+    // return null;
+    // }
+    // }
+    //
     // /**
-    //  * Get offline player's primary group (rank)
-    //  * 
-    //  * @param offlinePlayer OfflinePlayer to get group for
-    //  * @return Primary group name, or null if permission plugin is not available
-    //  */
+    // * Get offline player's primary group (rank)
+    // *
+    // * @param offlinePlayer OfflinePlayer to get group for
+    // * @return Primary group name, or null if permission plugin is not available
+    // */
     // private String getOfflinePlayerPrimaryGroup(OfflinePlayer offlinePlayer) {
-    //     if (permission == null || offlinePlayer == null) {
-    //         return null;
-    //     }
-    //     try {
-    //         String group = permission.getPrimaryGroup(null, offlinePlayer);
-    //         return group != null && !group.isEmpty() ? group : null;
-    //     } catch (Exception e) {
-    //         return null;
-    //     }
+    // if (permission == null || offlinePlayer == null) {
+    // return null;
     // }
-    // 
+    // try {
+    // String group = permission.getPrimaryGroup(null, offlinePlayer);
+    // return group != null && !group.isEmpty() ? group : null;
+    // } catch (Exception e) {
+    // return null;
+    // }
+    // }
+    //
     // /**
-    //  * Get all offline player groups (including ranks)
-    //  * 
-    //  * @param offlinePlayer OfflinePlayer to get groups for
-    //  * @return Array of group names, or null if permission plugin is not available
-    //  */
+    // * Get all offline player groups (including ranks)
+    // *
+    // * @param offlinePlayer OfflinePlayer to get groups for
+    // * @return Array of group names, or null if permission plugin is not available
+    // */
     // private String[] getOfflinePlayerGroups(OfflinePlayer offlinePlayer) {
-    //     if (permission == null || offlinePlayer == null) {
-    //         return null;
-    //     }
-    //     try {
-    //         String[] groups = permission.getPlayerGroups(null, offlinePlayer);
-    //         return groups != null && groups.length > 0 ? groups : null;
-    //     } catch (Exception e) {
-    //         return null;
-    //     }
+    // if (permission == null || offlinePlayer == null) {
+    // return null;
+    // }
+    // try {
+    // String[] groups = permission.getPlayerGroups(null, offlinePlayer);
+    // return groups != null && groups.length > 0 ? groups : null;
+    // } catch (Exception e) {
+    // return null;
+    // }
     // }
 
 }
