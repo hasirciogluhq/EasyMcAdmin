@@ -29,7 +29,19 @@ public class PlayerDataSerializer {
         playerObj.addProperty("online", true);
         playerObj.addProperty("display_name", player.getDisplayName());
         playerObj.addProperty("player_list_name", player.getPlayerListName());
-        playerObj.addProperty("ping", player.getPing());
+        try {
+            // Works on 1.17+
+            playerObj.addProperty("ping", player.getPing());
+        } catch (NoSuchMethodError e) {
+            // Fallback for older versions
+            try {
+                Object entityPlayer = player.getClass().getMethod("getHandle").invoke(player);
+                int ping = (int) entityPlayer.getClass().getField("ping").get(entityPlayer);
+                playerObj.addProperty("ping", ping);
+            } catch (Exception ex) {
+                playerObj.addProperty("ping", -1);
+            }
+        }
         playerObj.addProperty("first_played", player.getFirstPlayed());
         // last_played is only set on join, not in details updates
         // Don't set it here - it will be set in sendPlayerJoin() if needed
