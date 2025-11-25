@@ -113,11 +113,12 @@ public class RpcPacketHandler {
 
                                 // RpcErrorPacket errPacket = new RpcErrorPacket("player offline");
                                 // responseRpcPacket = errPacket;
+                                Bukkit.getLogger().log(Level.INFO, "Player response packet sent");
+                            } else {
+                                RpcErrorPacket errPacket = new RpcErrorPacket("internal error");
+                                transportManager.sendRpcResponsePacket(packet, errPacket);
                             }
 
-                            RpcErrorPacket errPacket = new RpcErrorPacket("internal error");
-                            transportManager.sendRpcResponsePacket(packet, errPacket);
-                            Bukkit.getLogger().log(Level.INFO, "Player response packet sent");
                         } catch (Exception e) {
                             // Send error response
                             Bukkit.getLogger().log(Level.INFO, "Player rpc handling internal error.." + e.getMessage());
