@@ -193,14 +193,18 @@ public class InventoryChangeListener implements Listener {
     // --- Inventory Click (shift, drag, taşıma vs) ---
     @EventHandler
     public void onClick(InventoryClickEvent e) {
-        if (e.getWhoClicked() instanceof Player p)
-            fire(p, "InventoryClick", false);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (e.getWhoClicked() instanceof Player p)
+                fire(p, "InventoryClick", false);
+        }, 1L);
     }
 
     @EventHandler
     public void onDrag(InventoryDragEvent e) {
-        if (e.getWhoClicked() instanceof Player p)
-            fire(p, "InventoryDrag", false);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (e.getWhoClicked() instanceof Player p)
+                fire(p, "InventoryDrag", false);
+        }, 1L);
     }
 
     // --- Consume (yemek, potion) ---
@@ -212,8 +216,10 @@ public class InventoryChangeListener implements Listener {
     // --- Interact (durability, bucket fill, pearl, fire, vb) ---
     @EventHandler
     public void onInteract(PlayerInteractEvent e) {
-        if (e.getPlayer() != null)
-            fire(e.getPlayer(), "Interact", false);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (e.getPlayer() != null)
+                fire(e.getPlayer(), "Interact", false);
+        }, 1L);
     }
 
     // --- Block break: tool durability azalır ---
@@ -301,7 +307,6 @@ public class InventoryChangeListener implements Listener {
 
         fire(player, "Quit", true);
     }
-
 
     @EventHandler
     public void onInventoryOpen(InventoryOpenEvent event) {
