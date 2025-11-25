@@ -1,8 +1,7 @@
-package com.hasirciogluhq.easymcadmin.player;
+package com.hasirciogluhq.easymcadmin.serializers.player;
 
 import com.google.gson.JsonObject;
-import com.hasirciogluhq.easymcadmin.player.serializers.LocationSerializer;
-import com.hasirciogluhq.easymcadmin.player.serializers.InventorySerializer;
+
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 

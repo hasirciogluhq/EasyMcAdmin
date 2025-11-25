@@ -15,8 +15,8 @@ import com.hasirciogluhq.easymcadmin.packets.PacketType;
 import com.hasirciogluhq.easymcadmin.packets.player.PlayerInventoryChangedPacket;
 import com.hasirciogluhq.easymcadmin.packets.rpc.RpcErrorPacket;
 import com.hasirciogluhq.easymcadmin.player.FakeOfflinePlayerManager;
-import com.hasirciogluhq.easymcadmin.player.serializers.InventorySerializer;
 import com.hasirciogluhq.easymcadmin.rpc.RpcStore;
+import com.hasirciogluhq.easymcadmin.serializers.player.*;
 import com.hasirciogluhq.easymcadmin.transport.TransportManager;
 
 public class RpcPacketHandler {

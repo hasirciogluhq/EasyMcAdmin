@@ -1,4 +1,4 @@
-package com.hasirciogluhq.easymcadmin.player.serializers;
+package com.hasirciogluhq.easymcadmin.serializers.player;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;

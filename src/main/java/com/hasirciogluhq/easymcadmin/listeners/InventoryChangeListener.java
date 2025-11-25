@@ -27,7 +27,7 @@ import com.google.gson.JsonObject;
 import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
 import com.hasirciogluhq.easymcadmin.packets.Packet;
 import com.hasirciogluhq.easymcadmin.packets.player.PlayerInventoryChangedPacket;
-import com.hasirciogluhq.easymcadmin.player.serializers.InventorySerializer;
+import com.hasirciogluhq.easymcadmin.serializers.player.*;
 
 public class InventoryChangeListener implements Listener {
 

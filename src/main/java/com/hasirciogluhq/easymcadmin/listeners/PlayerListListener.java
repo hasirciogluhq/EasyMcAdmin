@@ -6,39 +6,24 @@ import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
 import com.hasirciogluhq.easymcadmin.packets.Packet;
 import com.hasirciogluhq.easymcadmin.packets.player.PlayerJoinPacket;
 import com.hasirciogluhq.easymcadmin.packets.player.PlayerLeftPacket;
-import com.hasirciogluhq.easymcadmin.packets.player.PlayerInventoryChangedPacket;
+import com.hasirciogluhq.easymcadmin.serializers.player.*;
 import com.hasirciogluhq.easymcadmin.packets.player.PlayerDetailsUpdatePacket;
 import com.hasirciogluhq.easymcadmin.packets.player.PlayerChunkPacket;
 import com.hasirciogluhq.easymcadmin.packets.player.PlayerBalanceUpdatePacket;
-import com.hasirciogluhq.easymcadmin.player.PlayerDataSerializer;
-import com.hasirciogluhq.easymcadmin.player.serializers.InventorySerializer;
 import com.hasirciogluhq.easymcadmin.economy.EconomyManager;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.permission.Permission;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
-import org.bukkit.Statistic;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryCloseEvent;
-import org.bukkit.event.inventory.InventoryOpenEvent;
-import org.bukkit.event.entity.EntityPickupItemEvent;
-import org.bukkit.event.block.BlockPlaceEvent;
-import org.bukkit.event.player.PlayerDropItemEvent;
-import org.bukkit.event.player.PlayerItemConsumeEvent;
-import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.plugin.RegisteredServiceProvider;
 
-import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -192,7 +177,7 @@ public class PlayerListListener implements Listener {
     /**
      * Send player details update (all player info except inventory)
      * Used for periodic ticker updates
-     * Action: player.update
+     * Action: player.updated
      */
     public void sendPlayerDetailsUpdate(Player player) {
         if (!plugin.getTransportManager().isConnected() || !plugin.getTransportManager().isAuthenticated()) {

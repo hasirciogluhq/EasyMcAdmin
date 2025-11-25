@@ -4,6 +4,8 @@ import com.hasirciogluhq.easymcadmin.commands.MainCommand;
 import com.hasirciogluhq.easymcadmin.economy.EconomyManager;
 import com.hasirciogluhq.easymcadmin.listeners.InventoryChangeListener;
 import com.hasirciogluhq.easymcadmin.listeners.PlayerListListener;
+import com.hasirciogluhq.easymcadmin.listeners.PlayerStatsListener;
+import com.hasirciogluhq.easymcadmin.listeners.PlayerStatsListener;
 import com.hasirciogluhq.easymcadmin.metrics.MetricsScheduler;
 import com.hasirciogluhq.easymcadmin.packets.Packet;
 import com.hasirciogluhq.easymcadmin.rpc.RpcStore;
@@ -38,6 +40,7 @@ public class EasyMcAdmin extends JavaPlugin {
     private TransportInterface transport;
     private PlayerListListener playerListListener;
     private InventoryChangeListener inventoryChangeListener;
+    private PlayerStatsListener playerStatsListener;
     private EconomyManager economyManager;
 
     @Override
@@ -223,9 +226,12 @@ public class EasyMcAdmin extends JavaPlugin {
         // Register player list listener
         playerListListener = new PlayerListListener(this);
         inventoryChangeListener = new InventoryChangeListener(this);
+        // Periodic stats diff sender
+        playerStatsListener = new PlayerStatsListener(this);
 
         getServer().getPluginManager().registerEvents(playerListListener, this);
         getServer().getPluginManager().registerEvents(inventoryChangeListener, this);
+        getServer().getPluginManager().registerEvents(playerStatsListener, this);
     }
 
     /**
@@ -239,6 +245,10 @@ public class EasyMcAdmin extends JavaPlugin {
 
     public InventoryChangeListener getInventoryChangeListener() {
         return inventoryChangeListener;
+    }
+
+    public PlayerStatsListener getPlayerStatsListener() {
+        return playerStatsListener;
     }
 
     /**
