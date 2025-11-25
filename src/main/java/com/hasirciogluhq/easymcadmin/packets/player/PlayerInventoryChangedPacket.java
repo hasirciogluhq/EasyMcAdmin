@@ -10,9 +10,9 @@ import java.util.UUID;
  * Player inventory update packet - EVENT type
  * Sent when player inventory changes
  */
-public class PlayerInventoryUpdatePacket extends Packet {
+public class PlayerInventoryChangedPacket extends Packet {
     
-    public PlayerInventoryUpdatePacket(String inventoryHash, String enderChestHash, boolean fullSync, JsonObject inventoryData) {
+    public PlayerInventoryChangedPacket(String inventoryHash, String enderChestHash, boolean fullSync, JsonObject inventoryData) {
         super(
             UUID.randomUUID().toString(),
             PacketType.EVENT,
@@ -23,7 +23,7 @@ public class PlayerInventoryUpdatePacket extends Packet {
     
     private static JsonObject createMetadata(String inventoryHash, String enderChestHash, boolean fullSync) {
         JsonObject metadata = new JsonObject();
-        metadata.addProperty("action", "player.inventory_update");
+        metadata.addProperty("action", "player.inventory.changed");
         metadata.addProperty("requires_response", false);
         metadata.addProperty("inventory_hash", inventoryHash);
         // Always include ender chest hash if available (for validation)

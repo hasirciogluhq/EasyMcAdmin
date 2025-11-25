@@ -6,7 +6,7 @@ import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
 import com.hasirciogluhq.easymcadmin.packets.Packet;
 import com.hasirciogluhq.easymcadmin.packets.player.PlayerJoinPacket;
 import com.hasirciogluhq.easymcadmin.packets.player.PlayerLeftPacket;
-import com.hasirciogluhq.easymcadmin.packets.player.PlayerInventoryUpdatePacket;
+import com.hasirciogluhq.easymcadmin.packets.player.PlayerInventoryChangedPacket;
 import com.hasirciogluhq.easymcadmin.packets.player.PlayerDetailsUpdatePacket;
 import com.hasirciogluhq.easymcadmin.packets.player.PlayerChunkPacket;
 import com.hasirciogluhq.easymcadmin.packets.player.PlayerBalanceUpdatePacket;
@@ -32,6 +32,8 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.plugin.RegisteredServiceProvider;
+
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -281,21 +283,17 @@ public class PlayerListListener implements Listener {
         }
     }
 
-    /**
-     * Send player inventory update (only inventory data)
-     * 
-     * @param fullSync If true, sends full inventory sync (includes ender chest), if
-     *                 false sends diff sync
-     *                 Used for inventory events (click, open, close, etc.) and full
-     *                 sync requests
-     *                 Action: player.inventory_update
-     */
-    public void sendPlayerInventoryUpdate(Player player, boolean fullSync) {
-        if (!plugin.getTransportManager().isConnected() || !plugin.getTransportManager().isAuthenticated()) {
-            return;
-        }
+    // ... existing code ...
 
-        // fullSync = true;
+    /**
+     * Generates the player inventory update data.
+     *
+     * @param player   The player whose inventory data is to be generated.
+     * @param fullSync If true, generates full inventory sync data; otherwise,
+     *                 generates diff sync data.
+     * @return A JsonObject containing the inventory data.
+     */
+    public JsonObject generatePlayerInventoryData(Player player, boolean fullSync) {
         UUID playerUUID = player.getUniqueId();
 
         // Serialize current inventory and ender chest
@@ -316,70 +314,114 @@ public class PlayerListListener implements Listener {
         String inventoryHash = InventorySerializer.calculateInventoryHash(player.getInventory());
         String enderChestHash = InventorySerializer.calculateEnderChestHash(player.getEnderChest());
 
-        try {
-            JsonObject inventoryData = new JsonObject();
-            inventoryData.addProperty("player_uuid", playerUUID.toString());
+        JsonObject inventoryData = new JsonObject();
+        inventoryData.addProperty("player_uuid", playerUUID.toString());
 
-            if (fullSync) {
-                // Full sync: send complete inventory and ender chest
-                if (currentSerializedInventory != null) {
-                    inventoryData.add("inventory", currentSerializedInventory);
-                }
-                if (currentSerializedEnderChest != null) {
-                    inventoryData.add("ender_chest", currentSerializedEnderChest);
-                }
-
-                // Update stored states
-                if (currentSerializedInventory != null) {
-                    previousInventories.put(playerUUID, currentSerializedInventory);
-                    previousInventoryHashes.put(playerUUID, inventoryHash);
-                }
-                if (currentSerializedEnderChest != null) {
-                    previousEnderChests.put(playerUUID, currentSerializedEnderChest);
-                    previousEnderChestHashes.put(playerUUID, enderChestHash);
-                }
-            } else {
-                // Diff sync: send only changed slots
-                JsonArray previousInventory = previousInventories.get(playerUUID);
-                JsonArray previousEnderChest = previousEnderChests.get(playerUUID);
-                String previousInventoryHash = previousInventoryHashes.get(playerUUID);
-                String previousEnderChestHash = previousEnderChestHashes.get(playerUUID);
-
-                // Check if inventory hash changed
-                boolean inventoryChanged = !inventoryHash
-                        .equals(previousInventoryHash != null ? previousInventoryHash : "");
-                if (inventoryChanged && currentSerializedInventory != null) {
-                    JsonArray inventoryDiff = InventorySerializer.calculateDiff(previousInventory,
-                            currentSerializedInventory);
-                    inventoryData.add("inventory", inventoryDiff);
-                    inventoryData.addProperty("inventory_prev_hash", previousInventoryHash);
-
-                    // Update stored state
-                    previousInventories.put(playerUUID, currentSerializedInventory);
-                    previousInventoryHashes.put(playerUUID, inventoryHash);
-                }
-
-                // Check if ender chest hash changed
-                boolean enderChestChanged = !enderChestHash
-                        .equals(previousEnderChestHash != null ? previousEnderChestHash : "");
-                if (enderChestChanged && currentSerializedEnderChest != null) {
-                    JsonArray enderChestDiff = InventorySerializer.calculateDiff(previousEnderChest,
-                            currentSerializedEnderChest);
-                    inventoryData.add("ender_chest", enderChestDiff);
-                    inventoryData.addProperty("ender_chest_prev_hash", previousEnderChestHash);
-
-                    // Update stored state
-                    previousEnderChests.put(playerUUID, currentSerializedEnderChest);
-                    previousEnderChestHashes.put(playerUUID, enderChestHash);
-                }
+        if (fullSync) {
+            // Full sync: send complete inventory and ender chest
+            if (currentSerializedInventory != null) {
+                inventoryData.add("inventory", currentSerializedInventory);
+            }
+            if (currentSerializedEnderChest != null) {
+                inventoryData.add("ender_chest", currentSerializedEnderChest);
             }
 
-            Packet packet = new PlayerInventoryUpdatePacket(inventoryHash, enderChestHash, fullSync, inventoryData);
+            // Update stored states
+            if (currentSerializedInventory != null) {
+                previousInventories.put(playerUUID, currentSerializedInventory);
+                previousInventoryHashes.put(playerUUID, inventoryHash);
+            }
+            if (currentSerializedEnderChest != null) {
+                previousEnderChests.put(playerUUID, currentSerializedEnderChest);
+                previousEnderChestHashes.put(playerUUID, enderChestHash);
+            }
+        } else {
+            // Diff sync: send only changed slots
+            JsonArray previousInventory = previousInventories.get(playerUUID);
+            JsonArray previousEnderChest = previousEnderChests.get(playerUUID);
+            String previousInventoryHash = previousInventoryHashes.get(playerUUID);
+            String previousEnderChestHash = previousEnderChestHashes.get(playerUUID);
+
+            // Check if inventory hash changed
+            boolean inventoryChanged = !inventoryHash
+                    .equals(previousInventoryHash != null ? previousInventoryHash : "");
+            if (inventoryChanged && currentSerializedInventory != null) {
+                JsonArray inventoryDiff = InventorySerializer.calculateDiff(previousInventory,
+                        currentSerializedInventory);
+                inventoryData.add("inventory", inventoryDiff);
+                inventoryData.addProperty("inventory_prev_hash", previousInventoryHash);
+
+                // Update stored state
+                previousInventories.put(playerUUID, currentSerializedInventory);
+                previousInventoryHashes.put(playerUUID, inventoryHash);
+            }
+
+            // Check if ender chest hash changed
+            boolean enderChestChanged = !enderChestHash
+                    .equals(previousEnderChestHash != null ? previousEnderChestHash : "");
+            if (enderChestChanged && currentSerializedEnderChest != null) {
+                JsonArray enderChestDiff = InventorySerializer.calculateDiff(previousEnderChest,
+                        currentSerializedEnderChest);
+                inventoryData.add("ender_chest", enderChestDiff);
+                inventoryData.addProperty("ender_chest_prev_hash", previousEnderChestHash);
+
+                // Update stored state
+                previousEnderChests.put(playerUUID, currentSerializedEnderChest);
+                previousEnderChestHashes.put(playerUUID, enderChestHash);
+            }
+        }
+
+        return inventoryData;
+    }
+
+    /**
+     * Sends the player inventory update packet.
+     *
+     * @param inventoryHash  The hash of the player's inventory.
+     * @param enderChestHash The hash of the player's ender chest.
+     * @param fullSync       Indicates whether it's a full sync or a diff sync.
+     * @param inventoryData  The JsonObject containing the inventory data.
+     */
+    private void sendPlayerInventoryPacket(String inventoryHash, String enderChestHash, boolean fullSync,
+            JsonObject inventoryData) {
+        Packet packet = new PlayerInventoryChangedPacket(inventoryHash, enderChestHash, fullSync,
+                inventoryData);
+        try {
             plugin.getTransportManager().sendPacket(packet);
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Send player inventory update (only inventory data)
+     *
+     * @param player   The player whose inventory needs to be updated.
+     * @param fullSync If true, sends full inventory sync (includes ender chest), if
+     *                 false sends diff sync.
+     *                 Used for inventory events (click, open, close, etc.) and full
+     *                 sync requests.
+     *                 Action: player.inventory_update
+     */
+    public void sendPlayerInventoryUpdate(Player player, boolean fullSync) {
+        if (!plugin.getTransportManager().isConnected() || !plugin.getTransportManager().isAuthenticated()) {
+            return;
+        }
+
+        // Calculate hashes for both inventory and ender chest
+        String inventoryHash = InventorySerializer.calculateInventoryHash(player.getInventory());
+        String enderChestHash = InventorySerializer.calculateEnderChestHash(player.getEnderChest());
+
+        try {
+            JsonObject inventoryData = generatePlayerInventoryData(player, fullSync);
+            sendPlayerInventoryPacket(inventoryHash, enderChestHash, fullSync, inventoryData);
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to send player inventory update: " + e.getMessage());
         }
     }
+
+    // ... existing code ...
 
     /**
      * Send player details update (all player info except inventory)

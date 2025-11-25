@@ -10,11 +10,12 @@ import org.bukkit.entity.Player;
  * Utility class for serializing player data to JSON payloads
  */
 public class PlayerDataSerializer {
-    
+
     /**
      * Get player details payload (common function for details and chunk)
      * Includes: username, display_name, player_list_name, ping, first_played,
-     * last_played, location, experience, game_mode, health, food_level, saturation, fire_ticks, air_ticks
+     * last_played, location, experience, game_mode, health, food_level, saturation,
+     * fire_ticks, air_ticks
      * 
      * Note: balance, currency, groups, primary_group are temporarily commented out
      * as they are not part of the backend Player entity structure
@@ -49,11 +50,11 @@ public class PlayerDataSerializer {
         // TODO: Economy balance - will be handled separately via player_balances table
         // Double balance = VaultIntegration.getPlayerBalance(player);
         // if (balance != null) {
-        //     playerObj.addProperty("balance", balance);
+        // playerObj.addProperty("balance", balance);
         // }
         // String currencyName = VaultIntegration.getCurrencyName();
         // if (currencyName != null) {
-        //     playerObj.addProperty("currency", currencyName);
+        // playerObj.addProperty("currency", currencyName);
         // }
 
         // Send location
@@ -71,15 +72,15 @@ public class PlayerDataSerializer {
         // TODO: Permission groups - will be handled separately if needed
         // String primaryGroup = VaultIntegration.getPlayerPrimaryGroup(player);
         // if (primaryGroup != null) {
-        //     playerObj.addProperty("primary_group", primaryGroup);
+        // playerObj.addProperty("primary_group", primaryGroup);
         // }
         // String[] groups = VaultIntegration.getPlayerGroups(player);
         // if (groups != null && groups.length > 0) {
-        //     JsonArray groupsArray = new JsonArray();
-        //     for (String group : groups) {
-        //         groupsArray.add(group);
-        //     }
-        //     playerObj.add("groups", groupsArray);
+        // JsonArray groupsArray = new JsonArray();
+        // for (String group : groups) {
+        // groupsArray.add(group);
+        // }
+        // playerObj.add("groups", groupsArray);
         // }
 
         // Send game mode
@@ -126,15 +127,15 @@ public class PlayerDataSerializer {
         // TODO: Economy balance - will be handled separately via player_balances table
         // Double balance = VaultIntegration.getPlayerBalance(offlinePlayer);
         // if (balance != null) {
-        //     playerObj.addProperty("balance", balance);
+        // playerObj.addProperty("balance", balance);
         // } else {
-        //     playerObj.addProperty("balance", 0.0);
+        // playerObj.addProperty("balance", 0.0);
         // }
         // String currencyName = VaultIntegration.getCurrencyName();
         // if (currencyName != null) {
-        //     playerObj.addProperty("currency", currencyName);
+        // playerObj.addProperty("currency", currencyName);
         // } else {
-        //     playerObj.addProperty("currency", "N/A");
+        // playerObj.addProperty("currency", "N/A");
         // }
 
         // Location - N/A for offline players
@@ -148,22 +149,23 @@ public class PlayerDataSerializer {
         playerObj.add("experience", expObj);
 
         // TODO: Permission groups - will be handled separately if needed
-        // String primaryGroup = VaultIntegration.getOfflinePlayerPrimaryGroup(offlinePlayer);
+        // String primaryGroup =
+        // VaultIntegration.getOfflinePlayerPrimaryGroup(offlinePlayer);
         // if (primaryGroup != null) {
-        //     playerObj.addProperty("primary_group", primaryGroup);
+        // playerObj.addProperty("primary_group", primaryGroup);
         // } else {
-        //     playerObj.addProperty("primary_group", "N/A");
+        // playerObj.addProperty("primary_group", "N/A");
         // }
         // String[] groups = VaultIntegration.getOfflinePlayerGroups(offlinePlayer);
         // if (groups != null && groups.length > 0) {
-        //     JsonArray groupsArray = new JsonArray();
-        //     for (String group : groups) {
-        //         groupsArray.add(group);
-        //     }
-        //     playerObj.add("groups", groupsArray);
+        // JsonArray groupsArray = new JsonArray();
+        // for (String group : groups) {
+        // groupsArray.add(group);
+        // }
+        // playerObj.add("groups", groupsArray);
         // } else {
-        //     // Empty array if no groups
-        //     playerObj.add("groups", new JsonArray());
+        // // Empty array if no groups
+        // playerObj.add("groups", new JsonArray());
         // }
 
         // Health and food stats - N/A for offline players
@@ -177,11 +179,12 @@ public class PlayerDataSerializer {
     }
 
     /**
-     * Add player inventory, ender chest, experience, and location data to player object
+     * Add player inventory, ender chest, experience, and location data to player
+     * object
      * Used for join events
      * 
      * @param playerObj Player JSON object to add data to
-     * @param player Player to get data from
+     * @param player    Player to get data from
      */
     public static void addPlayerInventoryData(JsonObject playerObj, Player player) {
         if (player == null) {
@@ -211,4 +214,3 @@ public class PlayerDataSerializer {
         }
     }
 }
-

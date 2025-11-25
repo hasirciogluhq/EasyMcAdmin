@@ -1,10 +1,21 @@
 package com.hasirciogluhq.easymcadmin.packet_handlers;
 
-import org.bukkit.Bukkit;
+import java.util.UUID;
+import java.util.logging.Level;
 
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
+
+import com.google.gson.JsonObject;
 import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
+import com.hasirciogluhq.easymcadmin.listeners.PlayerListListener;
+import com.hasirciogluhq.easymcadmin.packets.GenericPacket;
 import com.hasirciogluhq.easymcadmin.packets.Packet;
 import com.hasirciogluhq.easymcadmin.packets.PacketType;
+import com.hasirciogluhq.easymcadmin.packets.player.PlayerInventoryChangedPacket;
+import com.hasirciogluhq.easymcadmin.packets.rpc.RpcErrorPacket;
+import com.hasirciogluhq.easymcadmin.player.FakeOfflinePlayerManager;
+import com.hasirciogluhq.easymcadmin.player.serializers.InventorySerializer;
 import com.hasirciogluhq.easymcadmin.rpc.RpcStore;
 import com.hasirciogluhq.easymcadmin.transport.TransportManager;
 
@@ -56,6 +67,64 @@ public class RpcPacketHandler {
 
                             try {
                                 transportManager.sendRpcResponsePacket(packet, errorResponsePacket);
+                            } catch (java.io.IOException ioException) {
+                                EasyMcAdmin.getInstance().getLogger()
+                                        .warning("Failed to send error response: " + ioException.getMessage());
+                            }
+                        }
+                    });
+                }
+                break;
+
+            case "player.inventory.request":
+                if (packet.getPayload().has("player_uuid")) {
+                    Bukkit.getLogger().log(Level.INFO, "player.inventory.request RPC Received");
+                    String playerUUIDStr = packet.getPayload().get("player_uuid").getAsString();
+
+                    Bukkit.getServer().getScheduler().runTask(EasyMcAdmin.getInstance(), () -> {
+                        try {
+                            UUID playerUUID = UUID.fromString(playerUUIDStr);
+                            // Use handlePlayerInventorySyncRequest method which calls
+                            // sendPlayerInventoryUpdate
+                            Bukkit.getLogger().log(Level.INFO, "UUID: " + playerUUIDStr);
+                            if (EasyMcAdmin.getInstance().getPlayerListListener() != null) {
+                                Player p = Bukkit.getPlayer(playerUUID);
+
+                                Boolean isOnline = (p != null && p.isOnline()) ? true : false;
+
+                                if (!isOnline) {
+                                    Bukkit.getLogger().log(Level.INFO, "Player is offline sending error");
+
+                                    RpcErrorPacket errPacket = new RpcErrorPacket("player offline");
+                                    transportManager.sendRpcResponsePacket(packet, errPacket);
+                                    return;
+                                }
+
+                                String inventoryHash = InventorySerializer
+                                        .calculateInventoryHash(p.getInventory());
+                                String enderChestHash = InventorySerializer
+                                        .calculateEnderChestHash(p.getEnderChest());
+                                JsonObject inventoryData = EasyMcAdmin.getInstance().getPlayerListListener()
+                                        .generatePlayerInventoryData(p, true);
+                                PlayerInventoryChangedPacket playerInventoryRequestResponseRpc = new PlayerInventoryChangedPacket(
+                                        inventoryHash, enderChestHash, true, inventoryData);
+
+                                transportManager.sendRpcResponsePacket(packet, playerInventoryRequestResponseRpc);
+
+                                // RpcErrorPacket errPacket = new RpcErrorPacket("player offline");
+                                // responseRpcPacket = errPacket;
+                            }
+
+                            RpcErrorPacket errPacket = new RpcErrorPacket("internal error");
+                            transportManager.sendRpcResponsePacket(packet, errPacket);
+                            Bukkit.getLogger().log(Level.INFO, "Player response packet sent");
+                        } catch (Exception e) {
+                            // Send error response
+                            Bukkit.getLogger().log(Level.INFO, "Player rpc handling internal error.." + e.getMessage());
+                            RpcErrorPacket errPacket = new RpcErrorPacket("internal error");
+
+                            try {
+                                transportManager.sendRpcResponsePacket(packet, errPacket);
                             } catch (java.io.IOException ioException) {
                                 EasyMcAdmin.getInstance().getLogger()
                                         .warning("Failed to send error response: " + ioException.getMessage());
