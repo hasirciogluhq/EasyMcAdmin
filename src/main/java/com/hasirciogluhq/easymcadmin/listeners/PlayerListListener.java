@@ -129,10 +129,15 @@ public class PlayerListListener implements Listener {
      * Send player join event with full details and inventory
      * Action: player.join
      */
-    public void sendPlayerJoin(Player player) {
+    @EventHandler
+    public void sendPlayerJoin(PlayerJoinEvent event) {
         if (!plugin.getTransportManager().isConnected() || !plugin.getTransportManager().isAuthenticated()) {
             return;
         }
+
+        Player player = event.getPlayer();
+        if (player == null)
+            return;
 
         try {
             JsonObject playerObj = PlayerDataSerializer.getPlayerDetailsPayload(player);
@@ -140,6 +145,7 @@ public class PlayerListListener implements Listener {
 
             // Set last_played to current time when player joins
             playerObj.addProperty("last_played", System.currentTimeMillis());
+            playerObj.addProperty("last_seen", System.currentTimeMillis());
 
             // Add inventory, ender chest data for join events
             PlayerDataSerializer.addPlayerInventoryData(playerObj, player);
@@ -158,10 +164,15 @@ public class PlayerListListener implements Listener {
      * Send player left event with full details
      * Action: player.left
      */
-    public void sendPlayerLeft(Player player) {
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent event) {
         if (!plugin.getTransportManager().isConnected() || !plugin.getTransportManager().isAuthenticated()) {
             return;
         }
+
+        Player player = event.getPlayer();
+        if (player == null)
+            return;
 
         try {
             JsonObject playerObj = PlayerDataSerializer.getPlayerDetailsPayload(player);
@@ -181,7 +192,7 @@ public class PlayerListListener implements Listener {
     /**
      * Send player details update (all player info except inventory)
      * Used for periodic ticker updates
-     * Action: player.details_update
+     * Action: player.update
      */
     public void sendPlayerDetailsUpdate(Player player) {
         if (!plugin.getTransportManager().isConnected() || !plugin.getTransportManager().isAuthenticated()) {

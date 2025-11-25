@@ -301,12 +301,14 @@ public class InventoryChangeListener implements Listener {
 
         // Clean up stored states when player quits
         UUID playerUUID = player.getUniqueId();
+
+        fire(player, "Quit", true);
+
+        // remove after deletion
         previousInventories.remove(playerUUID);
         previousEnderChests.remove(playerUUID);
         previousInventoryHashes.remove(playerUUID);
         previousEnderChestHashes.remove(playerUUID);
-
-        fire(player, "Quit", true);
     }
 
     @EventHandler

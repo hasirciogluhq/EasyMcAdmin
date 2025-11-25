@@ -27,7 +27,7 @@ public class PlayerDataSerializer {
         JsonObject playerObj = new JsonObject();
         playerObj.addProperty("uuid", player.getUniqueId().toString());
         playerObj.addProperty("username", player.getName());
-        playerObj.addProperty("online", true);
+        playerObj.addProperty("online", player.isOnline());
         playerObj.addProperty("display_name", player.getDisplayName());
         playerObj.addProperty("player_list_name", player.getPlayerListName());
         try {
@@ -44,6 +44,8 @@ public class PlayerDataSerializer {
             }
         }
         playerObj.addProperty("first_played", player.getFirstPlayed());
+        playerObj.addProperty("last_played", System.currentTimeMillis());
+        playerObj.addProperty("last_seen", System.currentTimeMillis());
         // last_played is only set on join, not in details updates
         // Don't set it here - it will be set in sendPlayerJoin() if needed
 
