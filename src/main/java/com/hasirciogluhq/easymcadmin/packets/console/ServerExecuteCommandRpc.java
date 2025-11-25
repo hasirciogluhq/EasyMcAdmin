@@ -1,6 +1,5 @@
 package com.hasirciogluhq.easymcadmin.packets.console;
 
-import com.hasirciogluhq.easymcadmin.packets.GenericPacket;
 import com.hasirciogluhq.easymcadmin.packets.Packet;
 
 // server.execute_console_command

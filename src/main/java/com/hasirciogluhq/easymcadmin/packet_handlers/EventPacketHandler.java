@@ -2,7 +2,6 @@ package com.hasirciogluhq.easymcadmin.packet_handlers;
 
 import java.util.UUID;
 
-
 import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
 import com.hasirciogluhq.easymcadmin.packets.Packet;
 import com.hasirciogluhq.easymcadmin.packets.economy.EconomyConfigPacket;
@@ -25,8 +24,8 @@ public class EventPacketHandler {
                         UUID playerUUID = UUID.fromString(playerUUIDStr);
                         // Use handlePlayerInventorySyncRequest method which calls
                         // sendPlayerInventoryUpdate
-                        if (EasyMcAdmin.getInstance().getPlayerListListener() != null) {
-                            EasyMcAdmin.getInstance().getPlayerListListener()
+                        if (EasyMcAdmin.getInstance().getEventListenerManager().getPlayerListListener() != null) {
+                            EasyMcAdmin.getInstance().getEventListenerManager().getPlayerListListener()
                                     .handlePlayerInventorySyncRequest(playerUUID);
                         }
                     } catch (IllegalArgumentException e) {

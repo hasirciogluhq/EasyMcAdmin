@@ -1,4 +1,4 @@
-package com.hasirciogluhq.easymcadmin.listeners;
+package com.hasirciogluhq.easymcadmin.listeners.player.inventory;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -17,10 +17,8 @@ import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.player.*;
-import org.bukkit.inventory.AnvilInventory;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.Plugin;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;

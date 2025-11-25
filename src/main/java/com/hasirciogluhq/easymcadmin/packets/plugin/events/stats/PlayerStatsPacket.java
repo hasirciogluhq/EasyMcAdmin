@@ -1,4 +1,4 @@
-package com.hasirciogluhq.easymcadmin.packets.plugin.events;
+package com.hasirciogluhq.easymcadmin.packets.plugin.events.stats;
 
 import com.google.gson.JsonObject;
 import com.hasirciogluhq.easymcadmin.packets.Packet;
@@ -6,9 +6,9 @@ import com.hasirciogluhq.easymcadmin.packets.PacketType;
 
 import java.util.UUID;
 
-public class PlayerStatsUpdateEventPacket extends Packet {
+public class PlayerStatsPacket extends Packet {
 
-    public PlayerStatsUpdateEventPacket(String statsHash, boolean fullSync, String previousHash, JsonObject playerData) {
+    public PlayerStatsPacket(String statsHash, boolean fullSync, String previousHash, JsonObject playerData) {
         super(
                 UUID.randomUUID().toString(),
                 PacketType.EVENT,

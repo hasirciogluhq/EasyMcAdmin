@@ -312,7 +312,7 @@ public class PlayerListListener implements Listener {
 
         // First, send full sync for all online players
         for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {
-            plugin.getInventoryChangeListener().sendPlayerInventoryUpdate(onlinePlayer, true);
+            plugin.getEventListenerManager().getInventoryChangeListener().sendPlayerInventoryUpdate(onlinePlayer, true);
             sendPlayerBalanceUpdate(onlinePlayer);
         }
 
@@ -351,7 +351,7 @@ public class PlayerListListener implements Listener {
     public void handlePlayerInventorySyncRequest(UUID playerUUID) {
         Player player = Bukkit.getPlayer(playerUUID);
         if (player != null && player.isOnline()) {
-            plugin.getInventoryChangeListener().sendPlayerInventoryUpdate(player, true);
+            plugin.getEventListenerManager().getInventoryChangeListener().sendPlayerInventoryUpdate(player, true);
         }
     }
 

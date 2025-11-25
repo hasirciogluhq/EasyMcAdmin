@@ -1,4 +1,4 @@
-package com.hasirciogluhq.easymcadmin.metrics;
+package com.hasirciogluhq.easymcadmin.metrics.server;
 
 import com.sun.management.OperatingSystemMXBean;
 import org.bukkit.Bukkit;

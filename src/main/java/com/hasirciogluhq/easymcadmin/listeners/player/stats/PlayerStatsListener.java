@@ -1,19 +1,18 @@
-package com.hasirciogluhq.easymcadmin.listeners;
+package com.hasirciogluhq.easymcadmin.listeners.player.stats;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
+import com.hasirciogluhq.easymcadmin.managers.DispatcherManager;
 import com.hasirciogluhq.easymcadmin.packets.Packet;
-import com.hasirciogluhq.easymcadmin.packets.plugin.events.PlayerStatsUpdateEventPacket;
+import com.hasirciogluhq.easymcadmin.packets.plugin.events.stats.PlayerStatsPacket;
 import com.hasirciogluhq.easymcadmin.serializers.player.PlayerStatsSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -30,9 +29,11 @@ public class PlayerStatsListener implements Listener {
     // Local cache for diffing stats between ticks
     private final Map<UUID, JsonObject> previousStats = new ConcurrentHashMap<>();
     private final Map<UUID, String> previousHashes = new ConcurrentHashMap<>();
+    private final DispatcherManager dispatcherManager;
 
-    public PlayerStatsListener(EasyMcAdmin plugin) {
+    public PlayerStatsListener(EasyMcAdmin plugin, DispatcherManager dispatcherManager) {
         this.plugin = plugin;
+        this.dispatcherManager = dispatcherManager;
         startTask();
     }
 
@@ -51,6 +52,14 @@ public class PlayerStatsListener implements Listener {
                 }
             }
         }, 60L, 60L);
+    }
+
+    // events
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        UUID uuid = event.getPlayer().getUniqueId();
+        previousStats.remove(uuid);
+        previousHashes.remove(uuid);
     }
 
     private void scanPlayer(Player player) {
@@ -79,8 +88,10 @@ public class PlayerStatsListener implements Listener {
         }
     }
 
-    private void sendPacket(Player player, JsonObject basePayload, JsonObject statsData, String hash, String prevHash,
+    private void sendPacket(
+            Player player, JsonObject basePayload, JsonObject statsData, String hash, String prevHash,
             boolean fullSync) {
+
         UUID uuid = player.getUniqueId();
 
         JsonObject playerData = new JsonObject();
@@ -88,30 +99,12 @@ public class PlayerStatsListener implements Listener {
         playerData.addProperty("username", player.getName());
         playerData.add("stats", statsData);
 
-        Packet packet = new PlayerStatsUpdateEventPacket(hash, fullSync, prevHash, playerData);
-        try {
-            plugin.getTransportManager().sendPacket(packet);
-            previousStats.put(uuid, fullSync ? statsData.deepCopy() : merge(previousStats.get(uuid), statsData));
-            previousHashes.put(uuid, hash);
-        } catch (IOException e) {
-            plugin.getLogger().warning("Failed to send player stats update: " + e.getMessage());
-        }
-    }
+        // Packet packet = new PlayerStatsPacket(hash, fullSync, prevHash, playerData);
 
-    @EventHandler
-    public void onPlayerJoin(PlayerJoinEvent event) {
-        Player player = event.getPlayer();
-        if (player != null) {
-            // Warm up cache shortly after join to avoid stale diffs
-            Bukkit.getScheduler().runTaskLaterAsynchronously(plugin, () -> scanPlayer(player), 1L);
-        }
-    }
+        this.dispatcherManager.getPlayerStatsDispatcher().dispatch(hash, hash, fullSync, playerData);
 
-    @EventHandler
-    public void onPlayerQuit(PlayerQuitEvent event) {
-        UUID uuid = event.getPlayer().getUniqueId();
-        previousStats.remove(uuid);
-        previousHashes.remove(uuid);
+        previousStats.put(uuid, fullSync ? statsData.deepCopy() : merge(previousStats.get(uuid), statsData));
+        previousHashes.put(uuid, hash);
     }
 
     private JsonObject calculateDiff(JsonObject previous, JsonObject current) {

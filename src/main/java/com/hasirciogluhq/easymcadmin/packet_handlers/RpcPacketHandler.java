@@ -8,14 +8,10 @@ import org.bukkit.entity.Player;
 
 import com.google.gson.JsonObject;
 import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
-import com.hasirciogluhq.easymcadmin.listeners.PlayerListListener;
-import com.hasirciogluhq.easymcadmin.packets.GenericPacket;
 import com.hasirciogluhq.easymcadmin.packets.Packet;
 import com.hasirciogluhq.easymcadmin.packets.PacketType;
 import com.hasirciogluhq.easymcadmin.packets.player.PlayerInventoryChangedPacket;
 import com.hasirciogluhq.easymcadmin.packets.rpc.RpcErrorPacket;
-import com.hasirciogluhq.easymcadmin.player.FakeOfflinePlayerManager;
-import com.hasirciogluhq.easymcadmin.rpc.RpcStore;
 import com.hasirciogluhq.easymcadmin.serializers.player.*;
 import com.hasirciogluhq.easymcadmin.transport.TransportManager;
 
@@ -87,8 +83,13 @@ public class RpcPacketHandler {
                             // Use handlePlayerInventorySyncRequest method which calls
                             // sendPlayerInventoryUpdate
                             Bukkit.getLogger().log(Level.INFO, "UUID: " + playerUUIDStr);
-                            if (EasyMcAdmin.getInstance().getPlayerListListener() != null) {
+                            if (EasyMcAdmin.getInstance().getEventListenerManager().getPlayerListListener() != null) {
                                 Player p = Bukkit.getPlayer(playerUUID);
+                                if (p == null) {
+                                    RpcErrorPacket errPacket = new RpcErrorPacket("player not found");
+                                    transportManager.sendRpcResponsePacket(packet, errPacket);
+                                    return;
+                                }
 
                                 Boolean isOnline = (p != null && p.isOnline()) ? true : false;
 
@@ -104,7 +105,8 @@ public class RpcPacketHandler {
                                         .calculateInventoryHash(p.getInventory());
                                 String enderChestHash = InventorySerializer
                                         .calculateEnderChestHash(p.getEnderChest());
-                                JsonObject inventoryData = EasyMcAdmin.getInstance().getInventoryChangeListener()
+                                JsonObject inventoryData = EasyMcAdmin.getInstance().getEventListenerManager()
+                                        .getInventoryChangeListener()
                                         .generatePlayerInventoryData(p, true);
                                 PlayerInventoryChangedPacket playerInventoryRequestResponseRpc = new PlayerInventoryChangedPacket(
                                         inventoryHash, enderChestHash, true, inventoryData);

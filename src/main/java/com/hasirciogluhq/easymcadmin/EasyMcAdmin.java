@@ -2,10 +2,8 @@ package com.hasirciogluhq.easymcadmin;
 
 import com.hasirciogluhq.easymcadmin.commands.MainCommand;
 import com.hasirciogluhq.easymcadmin.economy.EconomyManager;
-import com.hasirciogluhq.easymcadmin.listeners.InventoryChangeListener;
-import com.hasirciogluhq.easymcadmin.listeners.PlayerListListener;
-import com.hasirciogluhq.easymcadmin.listeners.PlayerStatsListener;
-import com.hasirciogluhq.easymcadmin.listeners.PlayerStatsListener;
+import com.hasirciogluhq.easymcadmin.managers.DispatcherManager;
+import com.hasirciogluhq.easymcadmin.managers.EventListenerManager;
 import com.hasirciogluhq.easymcadmin.metrics.MetricsScheduler;
 import com.hasirciogluhq.easymcadmin.packets.Packet;
 import com.hasirciogluhq.easymcadmin.rpc.RpcStore;
@@ -38,9 +36,9 @@ public class EasyMcAdmin extends JavaPlugin {
     private MetricsScheduler metricsScheduler;
     private TransportManager transportManager;
     private TransportInterface transport;
-    private PlayerListListener playerListListener;
-    private InventoryChangeListener inventoryChangeListener;
-    private PlayerStatsListener playerStatsListener;
+    private EventListenerManager eventListenerManager;
+    private DispatcherManager dispatcherManager;
+
     private EconomyManager economyManager;
 
     @Override
@@ -68,6 +66,9 @@ public class EasyMcAdmin extends JavaPlugin {
                 getConfig().getInt("transport.port", 8798));
 
         transportManager = new TransportManager(transport);
+
+        dispatcherManager = new DispatcherManager(this);
+        eventListenerManager = new EventListenerManager(this, dispatcherManager);
 
         // Setup packet handler for incoming packets from backend
         transport.setTransportListener(new TransportHandler(transportManager));
@@ -104,7 +105,7 @@ public class EasyMcAdmin extends JavaPlugin {
         economyManager = new EconomyManager();
 
         // Register event listeners
-        registerListeners();
+        this.eventListenerManager.RegisterAllListeners();
 
         // Start automatic connection task (20 ticks interval)
         startConnectionTask();
@@ -219,36 +220,12 @@ public class EasyMcAdmin extends JavaPlugin {
     }
 
     /**
-     * Register event listeners
-     * Note: Console output is handled by ConsoleOutputHandler, not event listeners
-     */
-    private void registerListeners() {
-        // Register player list listener
-        playerListListener = new PlayerListListener(this);
-        inventoryChangeListener = new InventoryChangeListener(this);
-        // Periodic stats diff sender
-        playerStatsListener = new PlayerStatsListener(this);
-
-        getServer().getPluginManager().registerEvents(playerListListener, this);
-        getServer().getPluginManager().registerEvents(inventoryChangeListener, this);
-        getServer().getPluginManager().registerEvents(playerStatsListener, this);
-    }
-
-    /**
      * Get the player list listener
      * 
      * @return PlayerListListener instance
      */
-    public PlayerListListener getPlayerListListener() {
-        return playerListListener;
-    }
-
-    public InventoryChangeListener getInventoryChangeListener() {
-        return inventoryChangeListener;
-    }
-
-    public PlayerStatsListener getPlayerStatsListener() {
-        return playerStatsListener;
+    public EventListenerManager getEventListenerManager() {
+        return this.eventListenerManager;
     }
 
     /**
@@ -306,9 +283,9 @@ public class EasyMcAdmin extends JavaPlugin {
 
         // Send all offline players in chunks after connection is established
         // Wait a bit for server to be fully ready
-        if (playerListListener != null) {
+        if (getEventListenerManager().getPlayerListListener() != null) {
             getServer().getScheduler().runTaskLater(this, () -> {
-                playerListListener.sendAllOfflinePlayers();
+                getEventListenerManager().getPlayerListListener().sendAllOfflinePlayers();
             }, 60L); // Wait 3 seconds (60 ticks) for server to be ready
         }
     }

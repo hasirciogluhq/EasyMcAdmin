@@ -1,6 +1,7 @@
 package com.hasirciogluhq.easymcadmin.metrics;
 
 import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
+import com.hasirciogluhq.easymcadmin.metrics.server.ServerMetricsCollector;
 import com.hasirciogluhq.easymcadmin.packets.Packet;
 import com.hasirciogluhq.easymcadmin.packets.ServerMetricsPacket;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -23,7 +24,9 @@ public class MetricsScheduler {
      */
     public interface TransportSender {
         void sendPacket(Packet packet);
+
         boolean isConnected();
+
         boolean isAuthenticated();
     }
 
@@ -104,4 +107,3 @@ public class MetricsScheduler {
         }
     }
 }
-
