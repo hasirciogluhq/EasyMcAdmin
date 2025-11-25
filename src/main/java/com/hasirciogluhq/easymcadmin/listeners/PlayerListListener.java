@@ -17,6 +17,7 @@ import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.permission.Permission;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.Statistic;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -51,12 +52,6 @@ public class PlayerListListener implements Listener {
     private boolean initialSyncDone = false;
     private Economy economy = null;
     private Permission permission = null;
-
-    // Store previous inventory and ender chest states for diff calculation
-    private final Map<UUID, JsonArray> previousInventories = new HashMap<>();
-    private final Map<UUID, JsonArray> previousEnderChests = new HashMap<>();
-    private final Map<UUID, String> previousInventoryHashes = new HashMap<>();
-    private final Map<UUID, String> previousEnderChestHashes = new HashMap<>();
 
     // ============================================================================
     // CONSTRUCTOR & SETUP
@@ -127,110 +122,6 @@ public class PlayerListListener implements Listener {
     }
 
     // ============================================================================
-    // EVENT HANDLERS
-    // ============================================================================
-
-    @EventHandler
-    public void onPlayerJoin(PlayerJoinEvent event) {
-        Player player = event.getPlayer();
-        sendPlayerJoin(player);
-        // Send full sync on join
-        sendPlayerInventoryUpdate(player, true);
-    }
-
-    @EventHandler
-    public void onPlayerQuit(PlayerQuitEvent event) {
-        Player player = event.getPlayer();
-        sendPlayerLeft(player);
-
-        // Clean up stored states when player quits
-        UUID playerUUID = player.getUniqueId();
-        previousInventories.remove(playerUUID);
-        previousEnderChests.remove(playerUUID);
-        previousInventoryHashes.remove(playerUUID);
-        previousEnderChestHashes.remove(playerUUID);
-    }
-
-    /**
-     * Handle inventory events - send update when inventory changes
-     */
-    @EventHandler
-    public void onInventoryClick(InventoryClickEvent event) {
-        if (event.getWhoClicked() instanceof Player) {
-            Player player = (Player) event.getWhoClicked();
-            // Send inventory update after a short delay to ensure inventory is updated
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                sendPlayerInventoryUpdate(player, false);
-            }, 1L);
-        }
-    }
-
-    @EventHandler
-    public void onInventoryOpen(InventoryOpenEvent event) {
-        if (event.getPlayer() instanceof Player) {
-            Player player = (Player) event.getPlayer();
-            sendPlayerInventoryUpdate(player, false);
-        }
-    }
-
-    @EventHandler
-    public void onInventoryClose(InventoryCloseEvent event) {
-        if (event.getPlayer() instanceof Player) {
-            Player player = (Player) event.getPlayer();
-            sendPlayerInventoryUpdate(player, false);
-        }
-    }
-
-    @EventHandler
-    public void onPlayerDropItem(PlayerDropItemEvent event) {
-        Player player = event.getPlayer();
-        // Send inventory update after a short delay to ensure inventory is updated
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            sendPlayerInventoryUpdate(player, false);
-        }, 1L);
-    }
-
-    @EventHandler
-    public void onEntityPickupItem(EntityPickupItemEvent event) {
-        if (event.getEntity() instanceof Player) {
-            Player player = (Player) event.getEntity();
-            // Send inventory update after a short delay to ensure inventory is updated
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                sendPlayerInventoryUpdate(player, false);
-            }, 1L);
-        }
-    }
-
-    @EventHandler
-    public void onBlockPlace(BlockPlaceEvent event) {
-        Player player = event.getPlayer();
-        // Send inventory update immediately - inventory is already updated at this
-        // point
-        sendPlayerInventoryUpdate(player, false);
-    }
-
-    @EventHandler
-    public void onPlayerItemConsume(PlayerItemConsumeEvent event) {
-        Player player = event.getPlayer();
-        // Send inventory update immediately - inventory is already updated at this
-        // point
-        sendPlayerInventoryUpdate(player, false);
-    }
-
-    @EventHandler
-    public void onPlayerInteract(PlayerInteractEvent event) {
-        Player player = event.getPlayer();
-        // Only trigger on right-click with items (food, blocks, etc.)
-        if (event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_AIR ||
-                event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) {
-            if (event.getItem() != null) {
-                // Send inventory update immediately - inventory changes happen synchronously
-                sendPlayerInventoryUpdate(player, false);
-            }
-        }
-    }
-
-    // ============================================================================
     // MAIN PUBLIC FUNCTIONS - Player Updates
     // ============================================================================
 
@@ -284,142 +175,6 @@ public class PlayerListListener implements Listener {
     }
 
     // ... existing code ...
-
-    /**
-     * Generates the player inventory update data.
-     *
-     * @param player   The player whose inventory data is to be generated.
-     * @param fullSync If true, generates full inventory sync data; otherwise,
-     *                 generates diff sync data.
-     * @return A JsonObject containing the inventory data.
-     */
-    public JsonObject generatePlayerInventoryData(Player player, boolean fullSync) {
-        UUID playerUUID = player.getUniqueId();
-
-        // Serialize current inventory and ender chest
-        JsonArray currentSerializedInventory = null;
-        JsonArray currentSerializedEnderChest = null;
-
-        PlayerInventory inventory = player.getInventory();
-        if (inventory != null) {
-            currentSerializedInventory = InventorySerializer.serializeInventory(inventory);
-        }
-
-        org.bukkit.inventory.Inventory enderChest = player.getEnderChest();
-        if (enderChest != null) {
-            currentSerializedEnderChest = InventorySerializer.serializeEnderChest(enderChest);
-        }
-
-        // Calculate hashes for both inventory and ender chest
-        String inventoryHash = InventorySerializer.calculateInventoryHash(player.getInventory());
-        String enderChestHash = InventorySerializer.calculateEnderChestHash(player.getEnderChest());
-
-        JsonObject inventoryData = new JsonObject();
-        inventoryData.addProperty("player_uuid", playerUUID.toString());
-
-        if (fullSync) {
-            // Full sync: send complete inventory and ender chest
-            if (currentSerializedInventory != null) {
-                inventoryData.add("inventory", currentSerializedInventory);
-            }
-            if (currentSerializedEnderChest != null) {
-                inventoryData.add("ender_chest", currentSerializedEnderChest);
-            }
-
-            // Update stored states
-            if (currentSerializedInventory != null) {
-                previousInventories.put(playerUUID, currentSerializedInventory);
-                previousInventoryHashes.put(playerUUID, inventoryHash);
-            }
-            if (currentSerializedEnderChest != null) {
-                previousEnderChests.put(playerUUID, currentSerializedEnderChest);
-                previousEnderChestHashes.put(playerUUID, enderChestHash);
-            }
-        } else {
-            // Diff sync: send only changed slots
-            JsonArray previousInventory = previousInventories.get(playerUUID);
-            JsonArray previousEnderChest = previousEnderChests.get(playerUUID);
-            String previousInventoryHash = previousInventoryHashes.get(playerUUID);
-            String previousEnderChestHash = previousEnderChestHashes.get(playerUUID);
-
-            // Check if inventory hash changed
-            boolean inventoryChanged = !inventoryHash
-                    .equals(previousInventoryHash != null ? previousInventoryHash : "");
-            if (inventoryChanged && currentSerializedInventory != null) {
-                JsonArray inventoryDiff = InventorySerializer.calculateDiff(previousInventory,
-                        currentSerializedInventory);
-                inventoryData.add("inventory", inventoryDiff);
-                inventoryData.addProperty("inventory_prev_hash", previousInventoryHash);
-
-                // Update stored state
-                previousInventories.put(playerUUID, currentSerializedInventory);
-                previousInventoryHashes.put(playerUUID, inventoryHash);
-            }
-
-            // Check if ender chest hash changed
-            boolean enderChestChanged = !enderChestHash
-                    .equals(previousEnderChestHash != null ? previousEnderChestHash : "");
-            if (enderChestChanged && currentSerializedEnderChest != null) {
-                JsonArray enderChestDiff = InventorySerializer.calculateDiff(previousEnderChest,
-                        currentSerializedEnderChest);
-                inventoryData.add("ender_chest", enderChestDiff);
-                inventoryData.addProperty("ender_chest_prev_hash", previousEnderChestHash);
-
-                // Update stored state
-                previousEnderChests.put(playerUUID, currentSerializedEnderChest);
-                previousEnderChestHashes.put(playerUUID, enderChestHash);
-            }
-        }
-
-        return inventoryData;
-    }
-
-    /**
-     * Sends the player inventory update packet.
-     *
-     * @param inventoryHash  The hash of the player's inventory.
-     * @param enderChestHash The hash of the player's ender chest.
-     * @param fullSync       Indicates whether it's a full sync or a diff sync.
-     * @param inventoryData  The JsonObject containing the inventory data.
-     */
-    private void sendPlayerInventoryPacket(String inventoryHash, String enderChestHash, boolean fullSync,
-            JsonObject inventoryData) {
-        Packet packet = new PlayerInventoryChangedPacket(inventoryHash, enderChestHash, fullSync,
-                inventoryData);
-        try {
-            plugin.getTransportManager().sendPacket(packet);
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * Send player inventory update (only inventory data)
-     *
-     * @param player   The player whose inventory needs to be updated.
-     * @param fullSync If true, sends full inventory sync (includes ender chest), if
-     *                 false sends diff sync.
-     *                 Used for inventory events (click, open, close, etc.) and full
-     *                 sync requests.
-     *                 Action: player.inventory_update
-     */
-    public void sendPlayerInventoryUpdate(Player player, boolean fullSync) {
-        if (!plugin.getTransportManager().isConnected() || !plugin.getTransportManager().isAuthenticated()) {
-            return;
-        }
-
-        // Calculate hashes for both inventory and ender chest
-        String inventoryHash = InventorySerializer.calculateInventoryHash(player.getInventory());
-        String enderChestHash = InventorySerializer.calculateEnderChestHash(player.getEnderChest());
-
-        try {
-            JsonObject inventoryData = generatePlayerInventoryData(player, fullSync);
-            sendPlayerInventoryPacket(inventoryHash, enderChestHash, fullSync, inventoryData);
-        } catch (Exception e) {
-            plugin.getLogger().warning("Failed to send player inventory update: " + e.getMessage());
-        }
-    }
 
     // ... existing code ...
 
@@ -561,7 +316,7 @@ public class PlayerListListener implements Listener {
 
         // First, send full sync for all online players
         for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {
-            sendPlayerInventoryUpdate(onlinePlayer, true);
+            plugin.getInventoryChangeListener().sendPlayerInventoryUpdate(onlinePlayer, true);
             sendPlayerBalanceUpdate(onlinePlayer);
         }
 
@@ -600,7 +355,7 @@ public class PlayerListListener implements Listener {
     public void handlePlayerInventorySyncRequest(UUID playerUUID) {
         Player player = Bukkit.getPlayer(playerUUID);
         if (player != null && player.isOnline()) {
-            sendPlayerInventoryUpdate(player, true);
+            plugin.getInventoryChangeListener().sendPlayerInventoryUpdate(player, true);
         }
     }
 
@@ -648,128 +403,4 @@ public class PlayerListListener implements Listener {
             plugin.getLogger().warning("Failed to send player chunk: " + e.getMessage());
         }
     }
-
-    // ============================================================================
-    // HELPER FUNCTIONS - Vault Integration
-    // ============================================================================
-    // TODO: Vault integration methods are temporarily commented out
-    // Economy balance and groups will be handled separately via player_balances
-    // table
-    // These methods are kept for future use if needed
-
-    // /**
-    // * Get player balance from economy plugin
-    // *
-    // * @param player Player to get balance for
-    // * @return Balance amount, or null if economy is not available
-    // */
-    // private Double getPlayerBalance(OfflinePlayer player) {
-    // if (economy == null || player == null) {
-    // return null;
-    // }
-    // try {
-    // return economy.getBalance(player);
-    // } catch (Exception e) {
-    // plugin.getLogger().warning("Failed to get balance for player " +
-    // player.getName() + ": " + e.getMessage());
-    // return null;
-    // }
-    // }
-    //
-    // /**
-    // * Get currency name from economy plugin
-    // *
-    // * @return Currency name, or null if economy is not available
-    // */
-    // private String getCurrencyName() {
-    // if (economy == null) {
-    // return null;
-    // }
-    // try {
-    // return economy.currencyNameSingular();
-    // } catch (Exception e) {
-    // return null;
-    // }
-    // }
-    //
-    // /**
-    // * Get player's primary group (rank)
-    // *
-    // * @param player Player to get group for
-    // * @return Primary group name, or null if permission plugin is not available
-    // */
-    // private String getPlayerPrimaryGroup(Player player) {
-    // if (permission == null || player == null) {
-    // return null;
-    // }
-    // try {
-    // String world = player.getWorld() != null ? player.getWorld().getName() :
-    // null;
-    // String group = permission.getPrimaryGroup(world, player);
-    // return group != null && !group.isEmpty() ? group : null;
-    // } catch (Exception e) {
-    // plugin.getLogger().warning("Failed to get primary group for player " +
-    // player.getName() + ": " + e.getMessage());
-    // return null;
-    // }
-    // }
-    //
-    // /**
-    // * Get all player groups (including ranks)
-    // *
-    // * @param player Player to get groups for
-    // * @return Array of group names, or null if permission plugin is not available
-    // */
-    // private String[] getPlayerGroups(Player player) {
-    // if (permission == null || player == null) {
-    // return null;
-    // }
-    // try {
-    // String world = player.getWorld() != null ? player.getWorld().getName() :
-    // null;
-    // String[] groups = permission.getPlayerGroups(world, player);
-    // return groups != null && groups.length > 0 ? groups : null;
-    // } catch (Exception e) {
-    // plugin.getLogger().warning("Failed to get groups for player " +
-    // player.getName() + ": " + e.getMessage());
-    // return null;
-    // }
-    // }
-    //
-    // /**
-    // * Get offline player's primary group (rank)
-    // *
-    // * @param offlinePlayer OfflinePlayer to get group for
-    // * @return Primary group name, or null if permission plugin is not available
-    // */
-    // private String getOfflinePlayerPrimaryGroup(OfflinePlayer offlinePlayer) {
-    // if (permission == null || offlinePlayer == null) {
-    // return null;
-    // }
-    // try {
-    // String group = permission.getPrimaryGroup(null, offlinePlayer);
-    // return group != null && !group.isEmpty() ? group : null;
-    // } catch (Exception e) {
-    // return null;
-    // }
-    // }
-    //
-    // /**
-    // * Get all offline player groups (including ranks)
-    // *
-    // * @param offlinePlayer OfflinePlayer to get groups for
-    // * @return Array of group names, or null if permission plugin is not available
-    // */
-    // private String[] getOfflinePlayerGroups(OfflinePlayer offlinePlayer) {
-    // if (permission == null || offlinePlayer == null) {
-    // return null;
-    // }
-    // try {
-    // String[] groups = permission.getPlayerGroups(null, offlinePlayer);
-    // return groups != null && groups.length > 0 ? groups : null;
-    // } catch (Exception e) {
-    // return null;
-    // }
-    // }
-
 }

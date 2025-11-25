@@ -104,7 +104,7 @@ public class RpcPacketHandler {
                                         .calculateInventoryHash(p.getInventory());
                                 String enderChestHash = InventorySerializer
                                         .calculateEnderChestHash(p.getEnderChest());
-                                JsonObject inventoryData = EasyMcAdmin.getInstance().getPlayerListListener()
+                                JsonObject inventoryData = EasyMcAdmin.getInstance().getInventoryChangeListener()
                                         .generatePlayerInventoryData(p, true);
                                 PlayerInventoryChangedPacket playerInventoryRequestResponseRpc = new PlayerInventoryChangedPacket(
                                         inventoryHash, enderChestHash, true, inventoryData);

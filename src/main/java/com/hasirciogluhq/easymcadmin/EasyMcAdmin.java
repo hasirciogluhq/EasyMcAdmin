@@ -2,6 +2,8 @@ package com.hasirciogluhq.easymcadmin;
 
 import com.hasirciogluhq.easymcadmin.commands.MainCommand;
 import com.hasirciogluhq.easymcadmin.economy.EconomyManager;
+import com.hasirciogluhq.easymcadmin.listeners.InventoryChangeListener;
+import com.hasirciogluhq.easymcadmin.listeners.PlayerListListener;
 import com.hasirciogluhq.easymcadmin.metrics.MetricsScheduler;
 import com.hasirciogluhq.easymcadmin.packets.Packet;
 import com.hasirciogluhq.easymcadmin.rpc.RpcStore;
@@ -34,7 +36,8 @@ public class EasyMcAdmin extends JavaPlugin {
     private MetricsScheduler metricsScheduler;
     private TransportManager transportManager;
     private TransportInterface transport;
-    private com.hasirciogluhq.easymcadmin.listeners.PlayerListListener playerListListener;
+    private PlayerListListener playerListListener;
+    private InventoryChangeListener inventoryChangeListener;
     private EconomyManager economyManager;
 
     @Override
@@ -218,8 +221,11 @@ public class EasyMcAdmin extends JavaPlugin {
      */
     private void registerListeners() {
         // Register player list listener
-        playerListListener = new com.hasirciogluhq.easymcadmin.listeners.PlayerListListener(this);
+        playerListListener = new PlayerListListener(this);
+        inventoryChangeListener = new InventoryChangeListener(this);
+
         getServer().getPluginManager().registerEvents(playerListListener, this);
+        getServer().getPluginManager().registerEvents(inventoryChangeListener, this);
     }
 
     /**
@@ -227,8 +233,12 @@ public class EasyMcAdmin extends JavaPlugin {
      * 
      * @return PlayerListListener instance
      */
-    public com.hasirciogluhq.easymcadmin.listeners.PlayerListListener getPlayerListListener() {
+    public PlayerListListener getPlayerListListener() {
         return playerListListener;
+    }
+
+    public InventoryChangeListener getInventoryChangeListener() {
+        return inventoryChangeListener;
     }
 
     /**
