@@ -45,7 +45,8 @@ public class InventoryChangeListener implements Listener {
 
     // --- Utility: tek noktadan çağır ---
     private void fire(Player p, String reason, Boolean fullUpdateRequires) {
-        Bukkit.getLogger().info("[InventoryChange] " + p.getName() + " changed inventory via " + reason);
+        // Bukkit.getLogger().info("[InventoryChange] " + p.getName() + " changed
+        // inventory via " + reason);
 
         if (fullUpdateRequires == null)
             fullUpdateRequires = false;
