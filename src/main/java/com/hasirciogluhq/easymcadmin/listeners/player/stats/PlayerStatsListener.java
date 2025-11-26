@@ -4,8 +4,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
 import com.hasirciogluhq.easymcadmin.managers.DispatcherManager;
-import com.hasirciogluhq.easymcadmin.packets.Packet;
-import com.hasirciogluhq.easymcadmin.packets.plugin.events.stats.PlayerStatsPacket;
 import com.hasirciogluhq.easymcadmin.serializers.player.PlayerStatsSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -74,7 +72,7 @@ public class PlayerStatsListener implements Listener {
         String previousHash = previousHashes.get(uuid);
 
         if (previousHash == null) {
-            sendPacket(player, payload, stats, currentHash, null, true);
+            sendPacket(player, stats, currentHash, null, true);
             return;
         }
 
@@ -84,12 +82,12 @@ public class PlayerStatsListener implements Listener {
             if (diff.size() == 0) {
                 return;
             }
-            sendPacket(player, payload, diff, currentHash, previousHash, false);
+            sendPacket(player, diff, currentHash, previousHash, false);
         }
     }
 
     private void sendPacket(
-            Player player, JsonObject basePayload, JsonObject statsData, String hash, String prevHash,
+            Player player, JsonObject statsData, String hash, String prevHash,
             boolean fullSync) {
 
         UUID uuid = player.getUniqueId();
