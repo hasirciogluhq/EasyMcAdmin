@@ -303,7 +303,7 @@ public class PlayerListListener implements Listener {
      * Called when WebSocket connection is established
      * Also sends full sync for all online players
      */
-    public void sendAllOfflinePlayers() {
+    public void syncAllPlayers() {
         if (initialSyncDone || !plugin.getTransportManager().isConnected()) {
             return;
         }

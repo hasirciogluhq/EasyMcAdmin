@@ -285,7 +285,7 @@ public class EasyMcAdmin extends JavaPlugin {
         // Wait a bit for server to be fully ready
         if (getEventListenerManager().getPlayerListListener() != null) {
             getServer().getScheduler().runTaskLater(this, () -> {
-                getEventListenerManager().getPlayerListListener().sendAllOfflinePlayers();
+                getEventListenerManager().getPlayerListListener().syncAllPlayers();
             }, 60L); // Wait 3 seconds (60 ticks) for server to be ready
         }
     }
