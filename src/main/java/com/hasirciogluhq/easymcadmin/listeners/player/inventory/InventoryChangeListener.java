@@ -69,17 +69,17 @@ public class InventoryChangeListener implements Listener {
 
         PlayerInventory inventory = player.getInventory();
         if (inventory != null) {
-            currentSerializedInventory = InventorySerializer.serializeInventory(inventory);
+            currentSerializedInventory = PlayerInventorySerializer.serializeInventory(inventory);
         }
 
         org.bukkit.inventory.Inventory enderChest = player.getEnderChest();
         if (enderChest != null) {
-            currentSerializedEnderChest = InventorySerializer.serializeEnderChest(enderChest);
+            currentSerializedEnderChest = PlayerInventorySerializer.serializeEnderChest(enderChest);
         }
 
         // Calculate hashes for both inventory and ender chest
-        String inventoryHash = InventorySerializer.calculateInventoryHash(player.getInventory());
-        String enderChestHash = InventorySerializer.calculateEnderChestHash(player.getEnderChest());
+        String inventoryHash = PlayerInventorySerializer.calculateInventoryHash(player.getInventory());
+        String enderChestHash = PlayerInventorySerializer.calculateEnderChestHash(player.getEnderChest());
 
         JsonObject inventoryData = new JsonObject();
         inventoryData.addProperty("player_uuid", playerUUID.toString());
@@ -113,7 +113,7 @@ public class InventoryChangeListener implements Listener {
             boolean inventoryChanged = !inventoryHash
                     .equals(previousInventoryHash != null ? previousInventoryHash : "");
             if (inventoryChanged && currentSerializedInventory != null) {
-                JsonArray inventoryDiff = InventorySerializer.calculateDiff(previousInventory,
+                JsonArray inventoryDiff = PlayerInventorySerializer.calculateDiff(previousInventory,
                         currentSerializedInventory);
                 inventoryData.add("inventory", inventoryDiff);
                 inventoryData.addProperty("inventory_prev_hash", previousInventoryHash);
@@ -127,7 +127,7 @@ public class InventoryChangeListener implements Listener {
             boolean enderChestChanged = !enderChestHash
                     .equals(previousEnderChestHash != null ? previousEnderChestHash : "");
             if (enderChestChanged && currentSerializedEnderChest != null) {
-                JsonArray enderChestDiff = InventorySerializer.calculateDiff(previousEnderChest,
+                JsonArray enderChestDiff = PlayerInventorySerializer.calculateDiff(previousEnderChest,
                         currentSerializedEnderChest);
                 inventoryData.add("ender_chest", enderChestDiff);
                 inventoryData.addProperty("ender_chest_prev_hash", previousEnderChestHash);
@@ -178,8 +178,8 @@ public class InventoryChangeListener implements Listener {
         }
 
         // Calculate hashes for both inventory and ender chest
-        String inventoryHash = InventorySerializer.calculateInventoryHash(player.getInventory());
-        String enderChestHash = InventorySerializer.calculateEnderChestHash(player.getEnderChest());
+        String inventoryHash = PlayerInventorySerializer.calculateInventoryHash(player.getInventory());
+        String enderChestHash = PlayerInventorySerializer.calculateEnderChestHash(player.getEnderChest());
 
         try {
             JsonObject inventoryData = generatePlayerInventoryData(player, fullSync);

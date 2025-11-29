@@ -1,6 +1,7 @@
 package com.hasirciogluhq.easymcadmin.serializers.player;
 
 import com.google.gson.JsonObject;
+import com.hasirciogluhq.easymcadmin.serializers.LocationSerializer;
 
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
@@ -194,12 +195,12 @@ public class PlayerDataSerializer {
 
         // Inventory
         if (player.getInventory() != null) {
-            playerObj.add("inventory", InventorySerializer.serializeInventory(player.getInventory()));
+            playerObj.add("inventory", PlayerInventorySerializer.serializeInventory(player.getInventory()));
         }
 
         // Ender Chest
         if (player.getEnderChest() != null) {
-            playerObj.add("ender_chest", InventorySerializer.serializeEnderChest(player.getEnderChest()));
+            playerObj.add("ender_chest", PlayerInventorySerializer.serializeEnderChest(player.getEnderChest()));
         }
 
         // Experience

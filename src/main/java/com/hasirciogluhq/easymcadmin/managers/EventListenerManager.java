@@ -14,7 +14,7 @@ public class EventListenerManager {
 
     private PlayerListListener playerListListener;
     private InventoryChangeListener inventoryChangeListener;
-    private PlayerStatsListener playerStatsListener;
+    // private PlayerStatsListener playerStatsListener;
     private PlayerStatsEventListener playerStatsEventListener;
     DispatcherManager dispatcherManager;
 
@@ -23,7 +23,8 @@ public class EventListenerManager {
         this.dispatcherManager = dp;
         this.playerListListener = new PlayerListListener(ema);
         this.inventoryChangeListener = new InventoryChangeListener(ema);
-        this.playerStatsListener = new PlayerStatsListener(ema, this.dispatcherManager);
+        // this is disabled until fix the sync problem.
+        // this.playerStatsListener = new PlayerStatsListener(ema, this.dispatcherManager);
         this.playerStatsEventListener = new PlayerStatsEventListener(ema, this.dispatcherManager);
     }
 
@@ -32,7 +33,7 @@ public class EventListenerManager {
 
         pm.registerEvents(playerListListener, this.plugin);
         pm.registerEvents(inventoryChangeListener, this.plugin);
-        pm.registerEvents(playerStatsListener, this.plugin);
+        // pm.registerEvents(playerStatsListener, this.plugin);
         pm.registerEvents(playerStatsEventListener, this.plugin);
     }
 
@@ -45,7 +46,7 @@ public class EventListenerManager {
     }
 
     public PlayerStatsListener getPlayerStatsListener() {
-        return playerStatsListener;
+        return null;
     }
 
     public PlayerStatsEventListener getPlayerStatsEventListener() {

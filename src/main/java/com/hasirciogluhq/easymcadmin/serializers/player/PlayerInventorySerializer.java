@@ -12,7 +12,7 @@ import java.security.MessageDigest;
  * Utility class for serializing player inventories to JSON
  * Includes serialization, hash calculation, and diff calculation
  */
-public class InventorySerializer {
+public class PlayerInventorySerializer {
     
     // ============================================================================
     // SERIALIZATION

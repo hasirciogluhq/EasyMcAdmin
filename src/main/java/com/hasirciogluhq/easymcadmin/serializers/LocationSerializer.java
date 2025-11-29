@@ -1,4 +1,4 @@
-package com.hasirciogluhq.easymcadmin.serializers.player;
+package com.hasirciogluhq.easymcadmin.serializers;
 
 import com.google.gson.JsonObject;
 import org.bukkit.Location;
