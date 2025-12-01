@@ -9,6 +9,13 @@ website: https://github.com/hasirciogluhq
 # Plugin load order (STARTUP, POSTWORLD)
 load: POSTWORLD
 
+# depend:
+
+softdepend:
+  - LuckPerms
+  - Vault
+  - PlaceholderAPI
+
 # Commands
 commands:
   easymcadmin:

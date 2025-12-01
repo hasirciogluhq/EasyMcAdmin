@@ -2,7 +2,6 @@ package com.hasirciogluhq.easymcadmin.packet_handlers.rpc;
 
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.logging.Level;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -17,7 +16,7 @@ import com.hasirciogluhq.easymcadmin.serializers.player.PlayerDataSerializer;
 import com.hasirciogluhq.easymcadmin.serializers.player.PlayerInventorySerializer;
 
 public class PlayerRpcHandler {
-    public static CompletableFuture<Packet> HandlePlayerRequestRPC(Packet packet) {
+    public static CompletableFuture<Packet> handlePlayerRequest(Packet packet) {
         CompletableFuture<Packet> future = new CompletableFuture<>();
 
         if (!packet.getPayload().has("player_uuid")) {

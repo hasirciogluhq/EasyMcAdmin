@@ -1,6 +1,5 @@
-package com.hasirciogluhq.easymcadmin.economy.providers;
+package com.hasirciogluhq.easymcadmin.providers.economy;
 
-import com.hasirciogluhq.easymcadmin.economy.EconomyProvider;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;

@@ -1,11 +1,18 @@
-package com.hasirciogluhq.easymcadmin.economy;
+package com.hasirciogluhq.easymcadmin.managers;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.hasirciogluhq.easymcadmin.economy.providers.CustomEconomyProvider;
-import com.hasirciogluhq.easymcadmin.economy.providers.VaultEconomyProvider;
-import com.hasirciogluhq.easymcadmin.economy.providers.iConomyEconomyProvider;
+import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
+import com.hasirciogluhq.easymcadmin.providers.economy.CustomEconomyProvider;
+import com.hasirciogluhq.easymcadmin.providers.economy.EconomyProvider;
+import com.hasirciogluhq.easymcadmin.providers.economy.VaultEconomyProvider;
+import com.hasirciogluhq.easymcadmin.providers.economy.iConomyEconomyProvider;
+
+import net.milkbowl.vault.economy.Economy;
+
+import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.plugin.RegisteredServiceProvider;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -18,13 +25,34 @@ import java.util.Map;
  * Handles provider registration, balance collection, and updates
  */
 public class EconomyManager {
-    
+    private final EasyMcAdmin plugin;
+    private Economy economy;
     private final Map<String, EconomyProvider> providers;
-    
-    public EconomyManager() {
+
+    public EconomyManager(EasyMcAdmin plugin) {
         this.providers = new HashMap<>();
+        this.plugin = plugin;
+        setupEconomy();
     }
-    
+
+    /**
+     * Setup Vault Economy if available
+     */
+    private void setupEconomy() {
+        if (Bukkit.getServer().getPluginManager().getPlugin("Vault") == null) {
+            plugin.getLogger().info("Vault not found, economy features will be disabled if compatible api not found.");
+        }
+
+        RegisteredServiceProvider<Economy> rsp = Bukkit.getServer().getServicesManager().getRegistration(Economy.class);
+        if (rsp == null) {
+            plugin.getLogger().info("No economy plugin found, economy features will be disabled");
+            return;
+        }
+
+        economy = rsp.getProvider();
+        plugin.getLogger().info("Economy plugin found: " + economy.getName());
+    }
+
     /**
      * Update economy configuration from backend
      * 
@@ -32,45 +60,50 @@ public class EconomyManager {
      */
     public void updateEconomyConfig(JsonObject economyConfig) {
         providers.clear();
-        
+
         if (!economyConfig.has("providers")) {
             return;
         }
-        
+
         JsonArray providersArray = economyConfig.getAsJsonArray("providers");
         for (int i = 0; i < providersArray.size(); i++) {
             JsonObject providerObj = providersArray.get(i).getAsJsonObject();
-            
+
             String name = providerObj.has("name") ? providerObj.get("name").getAsString() : "";
             boolean enabled = providerObj.has("enabled") && providerObj.get("enabled").getAsBoolean();
             String currencyName = providerObj.has("currency_name") && !providerObj.get("currency_name").isJsonNull()
-                    ? providerObj.get("currency_name").getAsString() : null;
-            boolean supportsVault = providerObj.has("supports_vault") && providerObj.get("supports_vault").getAsBoolean();
-            
+                    ? providerObj.get("currency_name").getAsString()
+                    : null;
+            boolean supportsVault = providerObj.has("supports_vault")
+                    && providerObj.get("supports_vault").getAsBoolean();
+
             if (name.isEmpty()) {
                 continue;
             }
-            
+
             EconomyProvider provider = createProvider(providerObj, name, enabled, currencyName, supportsVault);
             if (provider != null) {
                 providers.put(name, provider);
             }
         }
     }
-    
+
     /**
      * Create economy provider from config
      * If supports_vault is true, always use VaultEconomyProvider
-     * Otherwise, use specific provider implementations or custom reflection-based provider
+     * Otherwise, use specific provider implementations or custom reflection-based
+     * provider
      */
-    private EconomyProvider createProvider(JsonObject providerObj, String name, boolean enabled, String currencyName, boolean supportsVault) {
+    private EconomyProvider createProvider(JsonObject providerObj, String name, boolean enabled, String currencyName,
+            boolean supportsVault) {
         String nameLower = name.toLowerCase();
-        
-        // If provider supports Vault, always use Vault (Vault hooks into Essentials, iConomy, etc.)
+
+        // If provider supports Vault, always use Vault (Vault hooks into Essentials,
+        // iConomy, etc.)
         if (supportsVault) {
             return new VaultEconomyProvider(name, enabled, currencyName, supportsVault);
         }
-        
+
         // If no Vault support, check for specific providers
         if (nameLower.equals("iconomy")) {
             return new iConomyEconomyProvider(name, enabled, currencyName, supportsVault);
@@ -79,15 +112,17 @@ public class EconomyManager {
             if (!providerObj.has("config")) {
                 return null;
             }
-            
+
             JsonObject configObj = providerObj.getAsJsonObject("config");
-            
+
             // Parse plugin info
             String pluginId = configObj.has("plugin_id") ? configObj.get("plugin_id").getAsString() : "";
             String pluginName = configObj.has("plugin_name") ? configObj.get("plugin_name").getAsString() : "";
-            String javaClassName = configObj.has("java_class_name") ? configObj.get("java_class_name").getAsString() : "";
-            String javaClassPath = configObj.has("java_class_path") ? configObj.get("java_class_path").getAsString() : "";
-            
+            String javaClassName = configObj.has("java_class_name") ? configObj.get("java_class_name").getAsString()
+                    : "";
+            String javaClassPath = configObj.has("java_class_path") ? configObj.get("java_class_path").getAsString()
+                    : "";
+
             // Parse functions
             Map<String, String> functions = new HashMap<>();
             if (configObj.has("functions")) {
@@ -96,7 +131,7 @@ public class EconomyManager {
                     functions.put(key, functionsObj.get(key).getAsString());
                 }
             }
-            
+
             // Parse parameters
             Map<String, String> parameters = new HashMap<>();
             if (configObj.has("parameters")) {
@@ -105,17 +140,17 @@ public class EconomyManager {
                     parameters.put(key, paramsObj.get(key).getAsString());
                 }
             }
-            
+
             CustomEconomyProvider.CustomProviderConfig customConfig = new CustomEconomyProvider.CustomProviderConfig(
                     pluginId, pluginName, javaClassName, javaClassPath, functions, parameters);
-            
+
             return new CustomEconomyProvider(name, enabled, currencyName, supportsVault, customConfig);
         }
-        
+
         // Unknown provider without Vault support - not supported
         return null;
     }
-    
+
     /**
      * Get all balances for a player from all enabled providers
      * 
@@ -124,25 +159,24 @@ public class EconomyManager {
      */
     public List<PlayerBalanceEntry> getPlayerBalances(OfflinePlayer player) {
         List<PlayerBalanceEntry> balances = new ArrayList<>();
-        
+
         for (EconomyProvider provider : providers.values()) {
             if (!provider.isEnabled()) {
                 continue;
             }
-            
+
             BigDecimal balance = provider.getBalance(player);
             if (balance != null) {
                 balances.add(new PlayerBalanceEntry(
                         provider.getName(),
                         balance,
-                        provider.getCurrencyName()
-                ));
+                        provider.getCurrencyName()));
             }
         }
-        
+
         return balances;
     }
-    
+
     /**
      * Get all enabled providers
      * 
@@ -157,7 +191,7 @@ public class EconomyManager {
         }
         return enabled;
     }
-    
+
     /**
      * Player balance entry
      */
@@ -165,16 +199,23 @@ public class EconomyManager {
         private final String provider;
         private final BigDecimal amount;
         private final String currencyName;
-        
+
         public PlayerBalanceEntry(String provider, BigDecimal amount, String currencyName) {
             this.provider = provider;
             this.amount = amount;
             this.currencyName = currencyName;
         }
-        
-        public String getProvider() { return provider; }
-        public BigDecimal getAmount() { return amount; }
-        public String getCurrencyName() { return currencyName; }
+
+        public String getProvider() {
+            return provider;
+        }
+
+        public BigDecimal getAmount() {
+            return amount;
+        }
+
+        public String getCurrencyName() {
+            return currencyName;
+        }
     }
 }
-

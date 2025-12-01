@@ -1,8 +1,9 @@
 package com.hasirciogluhq.easymcadmin;
 
 import com.hasirciogluhq.easymcadmin.commands.MainCommand;
-import com.hasirciogluhq.easymcadmin.economy.EconomyManager;
+import com.hasirciogluhq.easymcadmin.managers.DataManager;
 import com.hasirciogluhq.easymcadmin.managers.DispatcherManager;
+import com.hasirciogluhq.easymcadmin.managers.EconomyManager;
 import com.hasirciogluhq.easymcadmin.managers.EventListenerManager;
 import com.hasirciogluhq.easymcadmin.managers.ServiceManager;
 import com.hasirciogluhq.easymcadmin.metrics.MetricsScheduler;
@@ -40,6 +41,7 @@ public class EasyMcAdmin extends JavaPlugin {
     private EventListenerManager eventListenerManager;
     private DispatcherManager dispatcherManager;
     private ServiceManager serviceManager;
+    private DataManager dataManager;
 
     private EconomyManager economyManager;
 
@@ -72,6 +74,7 @@ public class EasyMcAdmin extends JavaPlugin {
         dispatcherManager = new DispatcherManager(this);
         eventListenerManager = new EventListenerManager(this, dispatcherManager);
         serviceManager = new ServiceManager(this);
+        dataManager = new DataManager(this);
 
         // Setup packet handler for incoming packets from backend
         transport.setTransportListener(new TransportHandler(transportManager));
@@ -105,7 +108,7 @@ public class EasyMcAdmin extends JavaPlugin {
         registerCommands();
 
         // Initialize economy manager
-        economyManager = new EconomyManager();
+        economyManager = new EconomyManager(this);
 
         // Register event listeners
         this.eventListenerManager.RegisterAllListeners();
@@ -268,6 +271,15 @@ public class EasyMcAdmin extends JavaPlugin {
     }
 
     /**
+     * Get the Data Manager
+     * 
+     * @return DataManager instance
+     */
+    public DataManager getDataManager() {
+        return dataManager;
+    }
+
+    /**
      * Get the server ID
      * 
      * @return Server ID
@@ -297,7 +309,8 @@ public class EasyMcAdmin extends JavaPlugin {
         // Wait a bit for server to be fully ready
         if (getEventListenerManager().getPlayerListListener() != null) {
             getServer().getScheduler().runTaskLater(this, () -> {
-                getEventListenerManager().getPlayerListListener().syncAllPlayers();
+                getServiceManager().getPlayerService().syncOnlinePlayers();
+                getServiceManager().getPlayerService().syncOfflinePlayers();
             }, 60L); // Wait 3 seconds (60 ticks) for server to be ready
         }
     }

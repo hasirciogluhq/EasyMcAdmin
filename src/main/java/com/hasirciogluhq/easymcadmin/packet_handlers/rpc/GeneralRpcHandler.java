@@ -1,13 +1,13 @@
 package com.hasirciogluhq.easymcadmin.packet_handlers.rpc;
 
 import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
 
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.gson.JsonObject;
 import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
+import com.hasirciogluhq.easymcadmin.packets.backend.rpc.economy.EconomyConfigPacket;
 import com.hasirciogluhq.easymcadmin.packets.generic.GenericPacket;
 import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
 import com.hasirciogluhq.easymcadmin.packets.generic.PacketType;
@@ -48,8 +48,7 @@ public class GeneralRpcHandler {
                         UUID.randomUUID().toString(),
                         PacketType.RPC,
                         metadata,
-                        responsePayload
-                );
+                        responsePayload);
 
                 future.complete(response);
 
@@ -61,5 +60,17 @@ public class GeneralRpcHandler {
         });
 
         return future;
+    }
+
+    public static Packet handleEconomyConfigSet(Packet packet) {
+        EconomyConfigPacket economyConfigPacket = new EconomyConfigPacket(packet);
+        com.google.gson.JsonObject economyConfig = economyConfigPacket.getEconomyConfig();
+
+        // Update economy manager with new config
+        if (EasyMcAdmin.getInstance().getEconomyManager() != null) {
+            EasyMcAdmin.getInstance().getEconomyManager().updateEconomyConfig(economyConfig);
+        }
+
+        return EconomyConfigPacket.generateResponse(true);
     }
 }

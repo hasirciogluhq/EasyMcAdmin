@@ -3,18 +3,14 @@ package com.hasirciogluhq.easymcadmin.transport;
 import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
 import com.hasirciogluhq.easymcadmin.packet_handlers.EventPacketHandler;
 import com.hasirciogluhq.easymcadmin.packet_handlers.RpcPacketHandler;
-import com.hasirciogluhq.easymcadmin.packets.backend.rpc.economy.EconomyConfigPacket;
 import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
-import com.hasirciogluhq.easymcadmin.packets.generic.PacketType;
 import com.hasirciogluhq.easymcadmin.packets.generic.auth.GenericAuthPacket;
 import com.hasirciogluhq.easymcadmin.packets.generic.auth.GenericAuthPacketResponse;
-import com.hasirciogluhq.easymcadmin.rpc.RpcHandler;
 import com.hasirciogluhq.easymcadmin.rpc.RpcStore;
 
 import org.bukkit.Bukkit;
 
 import java.io.IOException;
-import java.util.UUID;
 
 public class TransportHandler implements TransportListener {
     private TransportManager manager;
@@ -29,10 +25,6 @@ public class TransportHandler implements TransportListener {
 
     @Override
     public void onPacket(Packet packet) {
-        String action = packet.getMetadata().has("action")
-                ? packet.getMetadata().get("action").getAsString()
-                : "";
-
         // Handle RPC packets
         if (packet.isRpcResponse()) {
             try {
@@ -45,7 +37,7 @@ public class TransportHandler implements TransportListener {
         }
 
         if (packet.isRpcRequest()) {
-            rpcPacketHandler.handleRpcRequest(packet);
+            rpcPacketHandler.handle(packet);
         }
 
         if (!manager.isAuthenticated()) {
@@ -57,9 +49,8 @@ public class TransportHandler implements TransportListener {
         // Handle different packet types (EVENT packets)
 
         if (packet.IsEvent()) {
-            eventPacketHandler.handleEvent(packet);
+            eventPacketHandler.handle(packet);
         }
-
     }
 
     private void onAuthResponse(Packet packet) {
@@ -117,7 +108,7 @@ public class TransportHandler implements TransportListener {
                         .warning("Error while sending auth packet: " + e.getMessage());
                 onAuthFailure(e.getMessage());
             }
-        }, 6L);
+        }, 2L);
 
     }
 

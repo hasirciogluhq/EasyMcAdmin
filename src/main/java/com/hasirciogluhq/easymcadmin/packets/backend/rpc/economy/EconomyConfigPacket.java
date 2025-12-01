@@ -1,7 +1,11 @@
 package com.hasirciogluhq.easymcadmin.packets.backend.rpc.economy;
 
+import java.util.UUID;
+
 import com.google.gson.JsonObject;
+import com.hasirciogluhq.easymcadmin.packets.generic.GenericPacket;
 import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
+import com.hasirciogluhq.easymcadmin.packets.generic.PacketType;
 
 /**
  * Economy config packet - EVENT type
@@ -9,11 +13,11 @@ import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
  */
 public class EconomyConfigPacket {
     private final Packet packet;
-    
+
     public EconomyConfigPacket(Packet packet) {
         this.packet = packet;
     }
-    
+
     /**
      * Get economy config from packet payload
      * 
@@ -25,7 +29,7 @@ public class EconomyConfigPacket {
         }
         return new JsonObject();
     }
-    
+
     /**
      * Get server ID from packet payload
      * 
@@ -37,5 +41,16 @@ public class EconomyConfigPacket {
         }
         return -1;
     }
-}
 
+    public static Packet generateResponse(Boolean ok) {
+        JsonObject metadata = new JsonObject();
+        metadata.addProperty("action", "plugin.economy.config.set");
+
+        JsonObject payload = new JsonObject();
+        payload.addProperty("ok", ok);
+
+        String packetId = UUID.randomUUID().toString();
+
+        return new GenericPacket(packetId, PacketType.RPC, metadata, payload);
+    }
+}

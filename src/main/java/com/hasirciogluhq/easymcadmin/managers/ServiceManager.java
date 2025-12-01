@@ -9,4 +9,8 @@ public class ServiceManager {
     public ServiceManager(EasyMcAdmin ema){
         this.playerService = new PlayerService(ema);
     }
+
+    public PlayerService getPlayerService(){
+        return playerService;
+    }
 }

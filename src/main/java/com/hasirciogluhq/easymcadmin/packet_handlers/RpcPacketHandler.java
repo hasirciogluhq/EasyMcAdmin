@@ -25,14 +25,14 @@ public class RpcPacketHandler {
 
     private void registerHandlers() {
         // ASYNC handlers
-        rpcHandlers.put("plugin.player.request", PlayerRpcHandler::HandlePlayerRequestRPC);
+        rpcHandlers.put("plugin.player.request", PlayerRpcHandler::handlePlayerRequest);
         rpcHandlers.put("plugin.player.inventory.request", PlayerRpcHandler::handlePlayerInventoryRequest);
         rpcHandlers.put("plugin.server.console.execute", GeneralRpcHandler::handleConsoleCommandExecute);
 
         // rpcHandlers.put("plugin.ping", MyHandler::handlePingSync); // Returns Packet
     }
 
-    public void handleRpcRequest(Packet packet) {
+    public void handle(Packet packet) {
         String action = packet.getAction();
 
         Function<Packet, Object> handler = rpcHandlers.get(action);

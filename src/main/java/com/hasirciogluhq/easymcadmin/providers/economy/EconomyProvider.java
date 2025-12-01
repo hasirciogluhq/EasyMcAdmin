@@ -1,4 +1,4 @@
-package com.hasirciogluhq.easymcadmin.economy;
+package com.hasirciogluhq.easymcadmin.providers.economy;
 
 import org.bukkit.OfflinePlayer;
 

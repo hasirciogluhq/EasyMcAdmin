@@ -39,12 +39,15 @@ dependencies {
     compileOnly("org.spigotmc:spigot-api:1.20.4-R0.1-SNAPSHOT")
     compileOnly("org.apache.logging.log4j:log4j-core:2.17.0")
     compileOnly("org.apache.logging.log4j:log4j-api:2.17.0")
+    
+    compileOnly("net.luckperms:api:5.4")
 
     // Vault API (for economy support)
     compileOnly("com.github.MilkBowl:VaultAPI:1.7")
 
     // JSON Serializer
     implementation("com.google.code.gson:gson:2.10.1")
+
 }
 
 tasks {
