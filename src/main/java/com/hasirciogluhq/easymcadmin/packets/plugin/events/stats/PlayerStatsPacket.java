@@ -19,8 +19,7 @@ public class PlayerStatsPacket extends Packet {
     private static JsonObject createMetadata(String statsHash, boolean fullSync, String previousHash) {
         // Include hashes to let backend validate or request resyncs
         JsonObject metadata = new JsonObject();
-        metadata.addProperty("action", "player.stats.updated");
-        metadata.addProperty("requires_response", false);
+        metadata.addProperty("action", "plugin.player.stats.updated");
         metadata.addProperty("stats_hash", statsHash);
         metadata.addProperty("full_sync", fullSync);
         if (previousHash != null && !previousHash.isEmpty()) {

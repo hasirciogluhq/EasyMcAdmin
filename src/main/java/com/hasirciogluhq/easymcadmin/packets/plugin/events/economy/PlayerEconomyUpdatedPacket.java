@@ -10,9 +10,9 @@ import java.util.UUID;
  * Player balance update packet - EVENT type
  * Sent when player balances need to be updated
  */
-public class PlayerBalancesUpdatedPacket extends Packet {
+public class PlayerEconomyUpdatedPacket extends Packet {
 
-    public PlayerBalancesUpdatedPacket(JsonObject playerData) {
+    public PlayerEconomyUpdatedPacket(JsonObject playerData) {
         super(
                 UUID.randomUUID().toString(),
                 PacketType.EVENT,
@@ -23,7 +23,6 @@ public class PlayerBalancesUpdatedPacket extends Packet {
     private static JsonObject createMetadata() {
         JsonObject metadata = new JsonObject();
         metadata.addProperty("action", "plugin.player.economy.updated");
-        metadata.addProperty("requires_response", false);
         return metadata;
     }
 

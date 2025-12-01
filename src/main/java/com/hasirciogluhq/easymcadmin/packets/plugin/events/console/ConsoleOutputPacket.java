@@ -23,8 +23,7 @@ public class ConsoleOutputPacket extends Packet {
     
     private static JsonObject createMetadata() {
         JsonObject metadata = new JsonObject();
-        metadata.addProperty("action", "console_output");
-        metadata.addProperty("requires_response", false); // EVENT packets don't need response
+        metadata.addProperty("action", "plugin.server.console.output");
         return metadata;
     }
     

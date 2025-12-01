@@ -23,8 +23,7 @@ public class PlayerJoinPacket extends Packet {
     
     private static JsonObject createMetadata() {
         JsonObject metadata = new JsonObject();
-        metadata.addProperty("action", "player.join");
-        metadata.addProperty("requires_response", false);
+        metadata.addProperty("action", "plugin.player.join");
         return metadata;
     }
     

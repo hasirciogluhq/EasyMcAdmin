@@ -24,7 +24,6 @@ public class PlayerInventoryResponse extends Packet {
     private static JsonObject createMetadata(String inventoryHash, String enderChestHash, boolean fullSync) {
         JsonObject metadata = new JsonObject();
         metadata.addProperty("action", "plugin.player.inventory.request.response");
-        metadata.addProperty("requires_response", false);
         metadata.addProperty("inventory_hash", inventoryHash);
         // Always include ender chest hash if available (for validation)
         if (enderChestHash != null && !enderChestHash.isEmpty()) {

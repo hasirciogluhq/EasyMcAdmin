@@ -22,8 +22,7 @@ public class PlayerDetailsUpdatePacket extends Packet {
 
     private static JsonObject createMetadata() {
         JsonObject metadata = new JsonObject();
-        metadata.addProperty("action", "player.updated");
-        metadata.addProperty("requires_response", false);
+        metadata.addProperty("action", "plugin.player.updated");
         return metadata;
     }
 

@@ -22,8 +22,7 @@ public class PlayerStatsEventPacket extends Packet {
 
     private static JsonObject createMetadata() {
         JsonObject metadata = new JsonObject();
-        metadata.addProperty("action", "player.stats.event");
-        metadata.addProperty("requires_response", false);
+        metadata.addProperty("action", "plugin.player.stats.event");
         return metadata;
     }
 

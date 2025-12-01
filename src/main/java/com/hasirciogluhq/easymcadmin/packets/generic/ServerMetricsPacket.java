@@ -24,8 +24,7 @@ public class ServerMetricsPacket extends Packet {
     
     private static JsonObject createMetadata() {
         JsonObject metadata = new JsonObject();
-        metadata.addProperty("action", "server_metrics");
-        metadata.addProperty("requires_response", false);
+        metadata.addProperty("action", "plugin.server.metrics");
         return metadata;
     }
     

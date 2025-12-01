@@ -23,8 +23,7 @@ public class PlayerLeftPacket extends Packet {
     
     private static JsonObject createMetadata() {
         JsonObject metadata = new JsonObject();
-        metadata.addProperty("action", "player.left");
-        metadata.addProperty("requires_response", false);
+        metadata.addProperty("action", "plugin.player.left");
         return metadata;
     }
     

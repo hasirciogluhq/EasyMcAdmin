@@ -23,8 +23,7 @@ public class OfflinePlayerChunkPacket extends Packet {
 
     private static JsonObject createMetadata() {
         JsonObject metadata = new JsonObject();
-        metadata.addProperty("action", "player.chunk");
-        metadata.addProperty("requires_response", false);
+        metadata.addProperty("action", "plugin.player.offline.chunk");
         return metadata;
     }
 

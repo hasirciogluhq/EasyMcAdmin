@@ -42,7 +42,7 @@ public class GeneralRpcHandler {
                 responsePayload.addProperty("output", "Command executed: " + command);
 
                 JsonObject metadata = new JsonObject();
-                metadata.addProperty("action", "console_command");
+                metadata.addProperty("action", "plugin.server.console.execute");
 
                 Packet response = new GenericPacket(
                         UUID.randomUUID().toString(),
