@@ -3,13 +3,13 @@ package com.hasirciogluhq.easymcadmin.listeners;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
-import com.hasirciogluhq.easymcadmin.packets.Packet;
-import com.hasirciogluhq.easymcadmin.packets.player.PlayerJoinPacket;
-import com.hasirciogluhq.easymcadmin.packets.player.PlayerLeftPacket;
+import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
+import com.hasirciogluhq.easymcadmin.packets.generic.player.PlayerBalanceUpdatePacket;
+import com.hasirciogluhq.easymcadmin.packets.generic.player.PlayerChunkPacket;
+import com.hasirciogluhq.easymcadmin.packets.generic.player.PlayerDetailsUpdatePacket;
+import com.hasirciogluhq.easymcadmin.packets.generic.player.PlayerJoinPacket;
+import com.hasirciogluhq.easymcadmin.packets.generic.player.PlayerLeftPacket;
 import com.hasirciogluhq.easymcadmin.serializers.player.*;
-import com.hasirciogluhq.easymcadmin.packets.player.PlayerDetailsUpdatePacket;
-import com.hasirciogluhq.easymcadmin.packets.player.PlayerChunkPacket;
-import com.hasirciogluhq.easymcadmin.packets.player.PlayerBalanceUpdatePacket;
 import com.hasirciogluhq.easymcadmin.economy.EconomyManager;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.permission.Permission;
@@ -31,7 +31,6 @@ import java.util.UUID;
  * Also sends all offline players in chunks after server startup
  */
 public class PlayerListListener implements Listener {
-
     private final EasyMcAdmin plugin;
     private static final int CHUNK_SIZE = 20;
     private boolean initialSyncDone = false;
@@ -128,8 +127,8 @@ public class PlayerListListener implements Listener {
             JsonObject playerObj = PlayerDataSerializer.getPlayerDetailsPayload(player);
             playerObj.addProperty("online", true);
 
-            // Set last_played to current time when player joins
-            playerObj.addProperty("last_played", System.currentTimeMillis());
+            // Set last_seen to current time when player joins
+            playerObj.addProperty("first_seen", player.getFirstPlayed());
             playerObj.addProperty("last_seen", System.currentTimeMillis());
 
             // Add inventory, ender chest data for join events
@@ -190,7 +189,7 @@ public class PlayerListListener implements Listener {
             plugin.getTransportManager().sendPacket(packet);
 
             // Send balance updates separately
-            sendPlayerBalanceUpdate(player);
+            // sendPlayerBalanceUpdate(player);
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to send player details update: " + e.getMessage());
         }
@@ -310,10 +309,13 @@ public class PlayerListListener implements Listener {
 
         initialSyncDone = true;
 
+        // !important
+        // send all online players to server first. And then update online player
+        // inventories
+
         // First, send full sync for all online players
         for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {
-            plugin.getEventListenerManager().getInventoryChangeListener().sendPlayerInventoryUpdate(onlinePlayer, true);
-            sendPlayerBalanceUpdate(onlinePlayer);
+            this.sendPlayerDetailsUpdate(onlinePlayer);
         }
 
         // Get all offline players (including online ones)

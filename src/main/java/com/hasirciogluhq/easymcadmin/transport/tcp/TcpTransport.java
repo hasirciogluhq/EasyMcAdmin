@@ -12,8 +12,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import com.google.gson.Gson;
 import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
-import com.hasirciogluhq.easymcadmin.packets.GenericPacket;
-import com.hasirciogluhq.easymcadmin.packets.Packet;
+import com.hasirciogluhq.easymcadmin.packets.generic.GenericPacket;
+import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
 import com.hasirciogluhq.easymcadmin.transport.TransportInterface;
 import com.hasirciogluhq.easymcadmin.transport.TransportListener;
 

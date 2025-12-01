@@ -1,6 +1,9 @@
-package com.hasirciogluhq.easymcadmin.packets;
+package com.hasirciogluhq.easymcadmin.packets.plugin.events.console;
 
 import com.google.gson.JsonObject;
+import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
+import com.hasirciogluhq.easymcadmin.packets.generic.PacketType;
+
 import java.util.UUID;
 
 /**

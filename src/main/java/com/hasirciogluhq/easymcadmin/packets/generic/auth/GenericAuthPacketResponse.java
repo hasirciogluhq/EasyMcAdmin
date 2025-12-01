@@ -1,6 +1,6 @@
-package com.hasirciogluhq.easymcadmin.packets.auth;
+package com.hasirciogluhq.easymcadmin.packets.generic.auth;
 
-import com.hasirciogluhq.easymcadmin.packets.Packet;
+import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
 
 public class GenericAuthPacketResponse extends Packet {
 

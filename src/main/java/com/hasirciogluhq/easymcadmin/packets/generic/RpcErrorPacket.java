@@ -1,8 +1,6 @@
-package com.hasirciogluhq.easymcadmin.packets.rpc;
+package com.hasirciogluhq.easymcadmin.packets.generic;
 
 import com.google.gson.JsonObject;
-import com.hasirciogluhq.easymcadmin.packets.Packet;
-import com.hasirciogluhq.easymcadmin.packets.PacketType;
 
 import java.util.UUID;
 

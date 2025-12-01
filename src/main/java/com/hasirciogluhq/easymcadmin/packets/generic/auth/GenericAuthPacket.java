@@ -1,10 +1,10 @@
-package com.hasirciogluhq.easymcadmin.packets.auth;
+package com.hasirciogluhq.easymcadmin.packets.generic.auth;
 
 import java.util.UUID;
 
 import com.google.gson.JsonObject;
-import com.hasirciogluhq.easymcadmin.packets.Packet;
-import com.hasirciogluhq.easymcadmin.packets.PacketType;
+import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
+import com.hasirciogluhq.easymcadmin.packets.generic.PacketType;
 
 public class GenericAuthPacket extends Packet {
 

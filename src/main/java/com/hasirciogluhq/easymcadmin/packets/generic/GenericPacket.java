@@ -1,4 +1,4 @@
-package com.hasirciogluhq.easymcadmin.packets;
+package com.hasirciogluhq.easymcadmin.packets.generic;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;

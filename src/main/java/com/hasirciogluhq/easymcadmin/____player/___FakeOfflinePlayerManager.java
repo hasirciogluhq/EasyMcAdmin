@@ -1,4 +1,4 @@
-package com.hasirciogluhq.easymcadmin.player;
+package com.hasirciogluhq.easymcadmin.____player;
 
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
@@ -9,7 +9,7 @@ import java.io.FileInputStream;
 import java.lang.reflect.*;
 import java.util.UUID;
 
-public class FakeOfflinePlayerManager {
+public class ___FakeOfflinePlayerManager {
 
     // // ---------------- PUBLIC API ---------------- //
 

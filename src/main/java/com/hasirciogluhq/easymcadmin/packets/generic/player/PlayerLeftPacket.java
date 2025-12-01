@@ -1,18 +1,18 @@
-package com.hasirciogluhq.easymcadmin.packets.player;
+package com.hasirciogluhq.easymcadmin.packets.generic.player;
 
 import com.google.gson.JsonObject;
-import com.hasirciogluhq.easymcadmin.packets.Packet;
-import com.hasirciogluhq.easymcadmin.packets.PacketType;
+import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
+import com.hasirciogluhq.easymcadmin.packets.generic.PacketType;
 
 import java.util.UUID;
 
 /**
- * Player balance update packet - EVENT type
- * Sent when player balances need to be updated
+ * Player left packet - EVENT type
+ * Sent when a player leaves the server
  */
-public class PlayerBalanceUpdatePacket extends Packet {
+public class PlayerLeftPacket extends Packet {
     
-    public PlayerBalanceUpdatePacket(JsonObject playerData) {
+    public PlayerLeftPacket(JsonObject playerData) {
         super(
             UUID.randomUUID().toString(),
             PacketType.EVENT,
@@ -23,7 +23,7 @@ public class PlayerBalanceUpdatePacket extends Packet {
     
     private static JsonObject createMetadata() {
         JsonObject metadata = new JsonObject();
-        metadata.addProperty("action", "player.balance_update");
+        metadata.addProperty("action", "player.left");
         metadata.addProperty("requires_response", false);
         return metadata;
     }

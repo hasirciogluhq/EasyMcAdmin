@@ -5,7 +5,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import com.hasirciogluhq.easymcadmin.packets.Packet;
+import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
 import com.hasirciogluhq.easymcadmin.rpc.RpcHandler;
 import com.hasirciogluhq.easymcadmin.rpc.RpcStore;
 

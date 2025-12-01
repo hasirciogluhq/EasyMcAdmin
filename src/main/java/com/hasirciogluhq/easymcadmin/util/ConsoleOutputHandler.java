@@ -1,8 +1,8 @@
 package com.hasirciogluhq.easymcadmin.util;
 
-import com.hasirciogluhq.easymcadmin.packets.ConsoleOutputPacket;
 import com.hasirciogluhq.easymcadmin.transport.TransportManager;
 import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
+import com.hasirciogluhq.easymcadmin.packets.plugin.events.console.ConsoleOutputPacket;
 
 import org.apache.logging.log4j.core.LogEvent;
 import org.apache.logging.log4j.core.appender.AbstractAppender;

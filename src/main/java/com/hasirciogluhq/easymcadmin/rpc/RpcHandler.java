@@ -1,7 +1,8 @@
 package com.hasirciogluhq.easymcadmin.rpc;
 
-import com.hasirciogluhq.easymcadmin.packets.Packet;
 import java.util.function.Consumer;
+
+import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
 
 /**
  * RPC Handler - stores handler function, timeout, and creation time

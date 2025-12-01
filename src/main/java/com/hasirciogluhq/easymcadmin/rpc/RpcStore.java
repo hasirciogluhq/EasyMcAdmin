@@ -1,8 +1,9 @@
 package com.hasirciogluhq.easymcadmin.rpc;
 
 import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
-import com.hasirciogluhq.easymcadmin.packets.Packet;
-import com.hasirciogluhq.easymcadmin.packets.PacketType;
+import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
+import com.hasirciogluhq.easymcadmin.packets.generic.PacketType;
+
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.Map;

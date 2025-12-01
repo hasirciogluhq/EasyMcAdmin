@@ -1,6 +1,6 @@
 package com.hasirciogluhq.easymcadmin.transport;
 
-import com.hasirciogluhq.easymcadmin.packets.Packet;
+import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
 
 public interface TransportListener {
     void onPacket(Packet packet);

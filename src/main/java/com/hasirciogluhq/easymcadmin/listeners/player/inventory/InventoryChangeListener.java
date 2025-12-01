@@ -23,8 +23,8 @@ import org.bukkit.entity.Player;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
-import com.hasirciogluhq.easymcadmin.packets.Packet;
-import com.hasirciogluhq.easymcadmin.packets.player.PlayerInventoryChangedPacket;
+import com.hasirciogluhq.easymcadmin.packets.backend.rpc.inventory.PlayerInventoryResponse;
+import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
 import com.hasirciogluhq.easymcadmin.serializers.player.*;
 
 public class InventoryChangeListener implements Listener {
@@ -151,7 +151,7 @@ public class InventoryChangeListener implements Listener {
      */
     private void sendPlayerInventoryPacket(String inventoryHash, String enderChestHash, boolean fullSync,
             JsonObject inventoryData) {
-        Packet packet = new PlayerInventoryChangedPacket(inventoryHash, enderChestHash, fullSync,
+        Packet packet = new PlayerInventoryResponse(inventoryHash, enderChestHash, fullSync,
                 inventoryData);
         try {
             plugin.getTransportManager().sendPacket(packet);

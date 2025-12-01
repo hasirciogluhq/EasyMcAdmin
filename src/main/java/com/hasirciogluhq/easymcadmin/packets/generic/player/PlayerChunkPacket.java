@@ -1,9 +1,9 @@
-package com.hasirciogluhq.easymcadmin.packets.player;
+package com.hasirciogluhq.easymcadmin.packets.generic.player;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.hasirciogluhq.easymcadmin.packets.Packet;
-import com.hasirciogluhq.easymcadmin.packets.PacketType;
+import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
+import com.hasirciogluhq.easymcadmin.packets.generic.PacketType;
 
 import java.util.UUID;
 

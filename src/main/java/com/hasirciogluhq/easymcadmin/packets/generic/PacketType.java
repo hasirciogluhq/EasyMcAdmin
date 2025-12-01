@@ -1,4 +1,4 @@
-package com.hasirciogluhq.easymcadmin.packets;
+package com.hasirciogluhq.easymcadmin.packets.generic;
 
 /**
  * Packet types - determines if packet is EVENT or RPC

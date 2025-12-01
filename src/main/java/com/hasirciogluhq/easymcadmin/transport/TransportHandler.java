@@ -3,11 +3,11 @@ package com.hasirciogluhq.easymcadmin.transport;
 import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
 import com.hasirciogluhq.easymcadmin.packet_handlers.EventPacketHandler;
 import com.hasirciogluhq.easymcadmin.packet_handlers.RpcPacketHandler;
-import com.hasirciogluhq.easymcadmin.packets.Packet;
-import com.hasirciogluhq.easymcadmin.packets.PacketType;
-import com.hasirciogluhq.easymcadmin.packets.auth.GenericAuthPacket;
-import com.hasirciogluhq.easymcadmin.packets.auth.GenericAuthPacketResponse;
-import com.hasirciogluhq.easymcadmin.packets.economy.EconomyConfigPacket;
+import com.hasirciogluhq.easymcadmin.packets.backend.rpc.economy.EconomyConfigPacket;
+import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
+import com.hasirciogluhq.easymcadmin.packets.generic.PacketType;
+import com.hasirciogluhq.easymcadmin.packets.generic.auth.GenericAuthPacket;
+import com.hasirciogluhq.easymcadmin.packets.generic.auth.GenericAuthPacketResponse;
 import com.hasirciogluhq.easymcadmin.rpc.RpcHandler;
 import com.hasirciogluhq.easymcadmin.rpc.RpcStore;
 

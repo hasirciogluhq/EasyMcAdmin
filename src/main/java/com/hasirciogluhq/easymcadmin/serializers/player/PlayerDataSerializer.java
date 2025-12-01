@@ -13,8 +13,8 @@ public class PlayerDataSerializer {
 
     /**
      * Get player details payload (common function for details and chunk)
-     * Includes: username, display_name, player_list_name, ping, first_played,
-     * last_played, location, experience, game_mode, health, food_level, saturation,
+     * Includes: username, display_name, player_list_name, ping, first_seen,
+     * last_seen, location, experience, game_mode, health, food_level, saturation,
      * fire_ticks, air_ticks
      * 
      * Note: balance, currency, groups, primary_group are temporarily commented out
@@ -43,10 +43,9 @@ public class PlayerDataSerializer {
                 playerObj.addProperty("ping", -1);
             }
         }
-        playerObj.addProperty("first_played", player.getFirstPlayed());
-        playerObj.addProperty("last_played", System.currentTimeMillis());
+        playerObj.addProperty("first_seen", player.getFirstPlayed());
         playerObj.addProperty("last_seen", System.currentTimeMillis());
-        // last_played is only set on join, not in details updates
+        // last_seen is only set on join, not in details updates
         // Don't set it here - it will be set in sendPlayerJoin() if needed
 
         // TODO: Economy balance - will be handled separately via player_balances table
@@ -123,8 +122,8 @@ public class PlayerDataSerializer {
         // Ping - N/A for offline players
         playerObj.addProperty("ping", -1);
 
-        playerObj.addProperty("first_played", offlinePlayer.getFirstPlayed());
-        playerObj.addProperty("last_played", offlinePlayer.getLastPlayed());
+        playerObj.addProperty("first_seen", offlinePlayer.getFirstPlayed());
+        playerObj.addProperty("last_seen", offlinePlayer.getLastPlayed());
 
         // TODO: Economy balance - will be handled separately via player_balances table
         // Double balance = VaultIntegration.getPlayerBalance(offlinePlayer);

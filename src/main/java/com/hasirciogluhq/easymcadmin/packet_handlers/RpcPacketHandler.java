@@ -1,144 +1,96 @@
 package com.hasirciogluhq.easymcadmin.packet_handlers;
 
-import java.util.UUID;
-import java.util.logging.Level;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 
-import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
-
-import com.google.gson.JsonObject;
 import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
-import com.hasirciogluhq.easymcadmin.packets.Packet;
-import com.hasirciogluhq.easymcadmin.packets.PacketType;
-import com.hasirciogluhq.easymcadmin.packets.player.PlayerInventoryChangedPacket;
-import com.hasirciogluhq.easymcadmin.packets.rpc.RpcErrorPacket;
-import com.hasirciogluhq.easymcadmin.serializers.player.*;
+import com.hasirciogluhq.easymcadmin.packet_handlers.rpc.GeneralRpcHandler;
+import com.hasirciogluhq.easymcadmin.packet_handlers.rpc.PlayerRpcHandler;
+import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
+import com.hasirciogluhq.easymcadmin.packets.generic.RpcErrorPacket;
 import com.hasirciogluhq.easymcadmin.transport.TransportManager;
 
 public class RpcPacketHandler {
-    private TransportManager transportManager;
+
+    private final TransportManager transportManager;
+
+    private final Map<String, Function<Packet, Object>> rpcHandlers = new HashMap<>();
 
     public RpcPacketHandler(TransportManager tm) {
         this.transportManager = tm;
+        registerHandlers();
+    }
+
+    private void registerHandlers() {
+        // ASYNC handlers
+        rpcHandlers.put("plugin.player.request", PlayerRpcHandler::HandlePlayerRequestRPC);
+        rpcHandlers.put("plugin.player.inventory.request", PlayerRpcHandler::handlePlayerInventoryRequest);
+        rpcHandlers.put("plugin.server.console.execute", GeneralRpcHandler::handleConsoleCommandExecute);
+
+        // rpcHandlers.put("plugin.ping", MyHandler::handlePingSync); // Returns Packet
     }
 
     public void handleRpcRequest(Packet packet) {
+        String action = packet.getAction();
 
-        switch (packet.getAction()) {
-            case "server.execute_console_command":
-                if (packet.getPayload().has("command")) {
-                    String command = packet.getPayload().get("command").getAsString();
+        Function<Packet, Object> handler = rpcHandlers.get(action);
 
-                    Bukkit.getServer().getScheduler().runTask(EasyMcAdmin.getInstance(), () -> {
-                        try {
-                            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
+        if (handler == null) {
+            EasyMcAdmin.getInstance().getLogger()
+                    .warning("No RPC handler found for action: " + action);
+            sendError(packet, "unknown rpc action: " + action);
+            return;
+        }
 
-                            // Send RPC response
-                            com.google.gson.JsonObject responsePayload = new com.google.gson.JsonObject();
-                            responsePayload.addProperty("output", "Command executed: " + command);
+        Object result;
 
-                            com.google.gson.JsonObject responseMetadata = new com.google.gson.JsonObject();
-                            responseMetadata.addProperty("action", "console_command");
+        try {
+            result = handler.apply(packet);
+        } catch (Exception e) {
+            sendError(packet, "rpc handler threw exception: " + e.getMessage());
+            return;
+        }
 
-                            com.hasirciogluhq.easymcadmin.packets.GenericPacket responsePacket = new com.hasirciogluhq.easymcadmin.packets.GenericPacket(
-                                    java.util.UUID.randomUUID().toString(),
-                                    PacketType.RPC,
-                                    responseMetadata,
-                                    responsePayload);
+        // 1) ASYNC handler: CompletableFuture<Packet>
+        if (result instanceof CompletableFuture<?>) {
+            CompletableFuture<?> future = (CompletableFuture<?>) result;
 
-                            transportManager.sendRpcResponsePacket(packet, responsePacket);
-                        } catch (Exception e) {
-                            // Send error response
-                            com.google.gson.JsonObject errorPayload = new com.google.gson.JsonObject();
-                            errorPayload.addProperty("error", "Failed to execute command: " + e.getMessage());
-
-                            com.google.gson.JsonObject errorMetadata = new com.google.gson.JsonObject();
-                            errorMetadata.addProperty("action", "console_command");
-
-                            com.hasirciogluhq.easymcadmin.packets.GenericPacket errorResponsePacket = new com.hasirciogluhq.easymcadmin.packets.GenericPacket(
-                                    java.util.UUID.randomUUID().toString(),
-                                    PacketType.RPC,
-                                    errorMetadata,
-                                    errorPayload);
-
-                            try {
-                                transportManager.sendRpcResponsePacket(packet, errorResponsePacket);
-                            } catch (java.io.IOException ioException) {
-                                EasyMcAdmin.getInstance().getLogger()
-                                        .warning("Failed to send error response: " + ioException.getMessage());
-                            }
-                        }
-                    });
+            future.thenAccept(obj -> {
+                if (obj instanceof Packet p) {
+                    sendResponse(packet, p);
+                } else {
+                    sendError(packet, "async rpc returned invalid type");
                 }
-                break;
+            });
 
-            case "player.inventory.request":
-                if (packet.getPayload().has("player_uuid")) {
-                    Bukkit.getLogger().log(Level.INFO, "player.inventory.request RPC Received");
-                    String playerUUIDStr = packet.getPayload().get("player_uuid").getAsString();
+            return;
+        }
 
-                    Bukkit.getServer().getScheduler().runTask(EasyMcAdmin.getInstance(), () -> {
-                        try {
-                            UUID playerUUID = UUID.fromString(playerUUIDStr);
-                            // Use handlePlayerInventorySyncRequest method which calls
-                            // sendPlayerInventoryUpdate
-                            Bukkit.getLogger().log(Level.INFO, "UUID: " + playerUUIDStr);
-                            if (EasyMcAdmin.getInstance().getEventListenerManager().getPlayerListListener() != null) {
-                                Player p = Bukkit.getPlayer(playerUUID);
-                                if (p == null) {
-                                    RpcErrorPacket errPacket = new RpcErrorPacket("player not found");
-                                    transportManager.sendRpcResponsePacket(packet, errPacket);
-                                    return;
-                                }
+        // 2) SYNC handler: directly returned Packet
+        if (result instanceof Packet p) {
+            sendResponse(packet, p);
+            return;
+        }
 
-                                Boolean isOnline = (p != null && p.isOnline()) ? true : false;
+        // 3) Invalid type
+        sendError(packet, "rpc handler returned unsupported type: " + result.getClass().getName());
+    }
 
-                                if (!isOnline) {
-                                    Bukkit.getLogger().log(Level.INFO, "Player is offline sending error");
+    private void sendResponse(Packet original, Packet response) {
+        try {
+            transportManager.sendRpcResponsePacket(original, response);
+        } catch (Exception e) {
+            EasyMcAdmin.getInstance().getLogger()
+                    .warning("Failed to send RPC response: " + e.getMessage());
+        }
+    }
 
-                                    RpcErrorPacket errPacket = new RpcErrorPacket("player offline");
-                                    transportManager.sendRpcResponsePacket(packet, errPacket);
-                                    return;
-                                }
-
-                                String inventoryHash = PlayerInventorySerializer
-                                        .calculateInventoryHash(p.getInventory());
-                                String enderChestHash = PlayerInventorySerializer
-                                        .calculateEnderChestHash(p.getEnderChest());
-                                JsonObject inventoryData = EasyMcAdmin.getInstance().getEventListenerManager()
-                                        .getInventoryChangeListener()
-                                        .generatePlayerInventoryData(p, true);
-                                PlayerInventoryChangedPacket playerInventoryRequestResponseRpc = new PlayerInventoryChangedPacket(
-                                        inventoryHash, enderChestHash, true, inventoryData);
-
-                                transportManager.sendRpcResponsePacket(packet, playerInventoryRequestResponseRpc);
-
-                                // RpcErrorPacket errPacket = new RpcErrorPacket("player offline");
-                                // responseRpcPacket = errPacket;
-                                Bukkit.getLogger().log(Level.INFO, "Player response packet sent");
-                            } else {
-                                RpcErrorPacket errPacket = new RpcErrorPacket("internal error");
-                                transportManager.sendRpcResponsePacket(packet, errPacket);
-                            }
-
-                        } catch (Exception e) {
-                            // Send error response
-                            Bukkit.getLogger().log(Level.INFO, "Player rpc handling internal error.." + e.getMessage());
-                            RpcErrorPacket errPacket = new RpcErrorPacket("internal error");
-
-                            try {
-                                transportManager.sendRpcResponsePacket(packet, errPacket);
-                            } catch (java.io.IOException ioException) {
-                                EasyMcAdmin.getInstance().getLogger()
-                                        .warning("Failed to send error response: " + ioException.getMessage());
-                            }
-                        }
-                    });
-                }
-                break;
-
-            default:
-                break;
+    private void sendError(Packet original, String msg) {
+        try {
+            transportManager.sendRpcResponsePacket(original, new RpcErrorPacket(msg));
+        } catch (Exception ignored) {
         }
     }
 }

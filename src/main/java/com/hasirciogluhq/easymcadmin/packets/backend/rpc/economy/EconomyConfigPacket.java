@@ -1,7 +1,7 @@
-package com.hasirciogluhq.easymcadmin.packets.economy;
+package com.hasirciogluhq.easymcadmin.packets.backend.rpc.economy;
 
 import com.google.gson.JsonObject;
-import com.hasirciogluhq.easymcadmin.packets.Packet;
+import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
 
 /**
  * Economy config packet - EVENT type

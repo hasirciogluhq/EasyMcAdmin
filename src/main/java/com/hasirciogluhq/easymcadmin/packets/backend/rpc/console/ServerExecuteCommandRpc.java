@@ -1,6 +1,6 @@
-package com.hasirciogluhq.easymcadmin.packets.console;
+package com.hasirciogluhq.easymcadmin.packets.backend.rpc.console;
 
-import com.hasirciogluhq.easymcadmin.packets.Packet;
+import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
 
 // server.execute_console_command
 public class ServerExecuteCommandRpc extends Packet {

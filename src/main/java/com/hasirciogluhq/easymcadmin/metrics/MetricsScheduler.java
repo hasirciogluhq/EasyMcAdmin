@@ -2,8 +2,9 @@ package com.hasirciogluhq.easymcadmin.metrics;
 
 import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
 import com.hasirciogluhq.easymcadmin.metrics.server.ServerMetricsCollector;
-import com.hasirciogluhq.easymcadmin.packets.Packet;
-import com.hasirciogluhq.easymcadmin.packets.ServerMetricsPacket;
+import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
+import com.hasirciogluhq.easymcadmin.packets.generic.ServerMetricsPacket;
+
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.Map;

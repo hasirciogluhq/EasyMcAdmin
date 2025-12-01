@@ -4,8 +4,9 @@ import com.hasirciogluhq.easymcadmin.commands.MainCommand;
 import com.hasirciogluhq.easymcadmin.economy.EconomyManager;
 import com.hasirciogluhq.easymcadmin.managers.DispatcherManager;
 import com.hasirciogluhq.easymcadmin.managers.EventListenerManager;
+import com.hasirciogluhq.easymcadmin.managers.ServiceManager;
 import com.hasirciogluhq.easymcadmin.metrics.MetricsScheduler;
-import com.hasirciogluhq.easymcadmin.packets.Packet;
+import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
 import com.hasirciogluhq.easymcadmin.rpc.RpcStore;
 import com.hasirciogluhq.easymcadmin.transport.TransportHandler;
 import com.hasirciogluhq.easymcadmin.transport.TransportInterface;
@@ -38,6 +39,7 @@ public class EasyMcAdmin extends JavaPlugin {
     private TransportInterface transport;
     private EventListenerManager eventListenerManager;
     private DispatcherManager dispatcherManager;
+    private ServiceManager serviceManager;
 
     private EconomyManager economyManager;
 
@@ -69,6 +71,7 @@ public class EasyMcAdmin extends JavaPlugin {
 
         dispatcherManager = new DispatcherManager(this);
         eventListenerManager = new EventListenerManager(this, dispatcherManager);
+        serviceManager = new ServiceManager(this);
 
         // Setup packet handler for incoming packets from backend
         transport.setTransportListener(new TransportHandler(transportManager));
@@ -235,6 +238,15 @@ public class EasyMcAdmin extends JavaPlugin {
      */
     public EconomyManager getEconomyManager() {
         return economyManager;
+    }
+
+    /**
+     * Get the ServiceManager instance
+     * 
+     * @return ServiceManager instance
+     */
+    public ServiceManager getServiceManager() {
+        return serviceManager;
     }
 
     /**

@@ -5,7 +5,7 @@ import java.io.IOException;
 import com.google.gson.JsonObject;
 import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
 import com.hasirciogluhq.easymcadmin.interfaces.player.stats.PlayerStatsEventDispatcherInterface;
-import com.hasirciogluhq.easymcadmin.packets.Packet;
+import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
 import com.hasirciogluhq.easymcadmin.packets.plugin.events.stats.PlayerStatsEventPacket;
 
 public class PlayerStatsEventDispatcher implements PlayerStatsEventDispatcherInterface {
