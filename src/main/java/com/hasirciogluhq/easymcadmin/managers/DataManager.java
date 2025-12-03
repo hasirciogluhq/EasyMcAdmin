@@ -148,4 +148,47 @@ public class DataManager {
         ensureLoaded(fileName);
         return fileCache.get(fileName);
     }
+
+    public void setData(String fileName, Object data) {
+        ensureLoaded(fileName);
+        fileCache.put(fileName, data != null ? data : new ConcurrentHashMap<>());
+        saveAsync(fileName);
+    }
+
+    /**
+     * Returns the data directly as a Map.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getDataMap(String fileName) {
+        return (Map<String, Object>) getData(fileName);
+    }
+
+    /**
+     * Returns the value for a specific key.
+     */
+    public Object get(String fileName, String key) {
+        Map<String, Object> data = getDataMap(fileName);
+        return data.get(key);
+    }
+
+    /**
+     * Writes a value for a key and updates the cache.
+     * (Does not write to disk immediately; auto-save or saveAsync is needed)
+     */
+    public void set(String fileName, String key, Object value) {
+        Map<String, Object> data = getDataMap(fileName);
+        data.put(key, value);
+    }
+
+    /**
+     * Safely retrieves a list of strings.
+     */
+    @SuppressWarnings("unchecked")
+    public List<String> getStringList(String fileName, String key) {
+        Object val = get(fileName, key);
+        if (val instanceof List) {
+            return (List<String>) val;
+        }
+        return new ArrayList<>();
+    }
 }
