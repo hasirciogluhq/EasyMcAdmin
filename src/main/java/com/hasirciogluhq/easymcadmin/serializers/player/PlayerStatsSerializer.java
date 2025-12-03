@@ -118,13 +118,17 @@ public class PlayerStatsSerializer {
         long total = 0;
 
         for (EntityType entityType : EntityType.values()) {
+            // Skip non-living entities (items, arrows, etc.)
             if (!entityType.isAlive()) {
                 continue;
             }
 
             int value = safeStatistic(player, Statistic.KILL_ENTITY, entityType);
             if (value > 0) {
-                String key = entityType.getKey() != null ? entityType.getKey().getKey() : entityType.name().toLowerCase();
+                // FIX: Using name() instead of getKey() is safer and works in every version.
+                // Ex: EntityType.ZOMBIE -> "zombie"
+                String key = entityType.name().toLowerCase();
+
                 details.addProperty(key, value);
                 total += value;
             }

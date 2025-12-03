@@ -47,6 +47,9 @@ public class RpcPacketHandler {
         Object result;
 
         try {
+            // This try-catch only captures errors while CALLING the handler function
+            // synchronously.
+            // It does not catch errors inside the Future.
             result = handler.apply(packet);
         } catch (Exception e) {
             sendError(packet, "rpc handler threw exception: " + e.getMessage());
@@ -58,11 +61,17 @@ public class RpcPacketHandler {
             CompletableFuture<?> future = (CompletableFuture<?>) result;
 
             future.thenAccept(obj -> {
+                // Runs if the operation completes SUCCESSFULLY
                 if (obj instanceof Packet p) {
                     sendResponse(packet, p);
                 } else {
                     sendError(packet, "async rpc returned invalid type");
                 }
+            }).exceptionally(ex -> {
+                // [!] ADDED PART: Runs if the operation FAILS (throws an exception)
+                EasyMcAdmin.getInstance().getLogger().warning("Async RPC Error for " + action + ": " + ex.getMessage());
+                sendError(packet, "async rpc internal error: " + ex.getMessage());
+                return null;
             });
 
             return;

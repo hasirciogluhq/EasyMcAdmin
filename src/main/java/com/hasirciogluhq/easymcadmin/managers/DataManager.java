@@ -15,10 +15,10 @@ public class DataManager {
     private final EasyMcAdmin plugin;
     private final Gson gson;
 
-    // çoklu dosya -> JSON cache (memory)
+    // multiple files -> JSON cache (memory)
     private final Map<String, Object> fileCache = new ConcurrentHashMap<>();
 
-    // dosya lock'u (eş zamanlı dosya IO için gerekli)
+    // file lock (required for concurrent file IO)
     private final Object fileLock = new Object();
 
     public DataManager(EasyMcAdmin plugin) {
@@ -28,21 +28,21 @@ public class DataManager {
     }
 
     // -----------------------------------------------------
-    // 📌 ENSURE LOADED (otomatik yükleyici + hata fırlatıcı)
+    // 📌 ENSURE LOADED (auto loader + exception thrower)
     // -----------------------------------------------------
     private void ensureLoaded(String fileName) {
-        // eğer memory'de varsa sıkıntı yok
+        // if it's already in memory, no problem
         if (fileCache.containsKey(fileName))
             return;
 
-        // memory'de yoksa yüklemeyi dene
+        // if it's not in memory, try loading it
         try {
             load(fileName);
         } catch (Exception e) {
             throw new RuntimeException("Data file '" + fileName + "' yüklenemedi!", e);
         }
 
-        // hâlâ yoksa exception
+        // if still missing, throw exception
         if (!fileCache.containsKey(fileName)) {
             throw new RuntimeException("Data file '" + fileName + "' cache'e eklenemedi!");
         }
@@ -60,7 +60,7 @@ public class DataManager {
                     plugin.getDataFolder().mkdirs();
                     file.createNewFile();
 
-                    // boş json oluştur
+                    // create an empty json
                     try (Writer writer = new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8)) {
                         gson.toJson(new HashMap<>(), writer);
                     }
@@ -127,7 +127,7 @@ public class DataManager {
     }
 
     // -----------------------------------------------------
-    // ⏰ AUTO SAVE (2 dakikada bir)
+    // ⏰ AUTO SAVE (every 2 minutes)
     // -----------------------------------------------------
     private void startAutoSave() {
         new BukkitRunnable() {

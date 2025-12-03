@@ -38,7 +38,7 @@ public class ServerMetricsCollector {
         double cpuLoad = 0.0;
         try {
             OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
-            cpuLoad = osBean.getProcessCpuLoad(); // 0-1 arası
+            cpuLoad = osBean.getProcessCpuLoad(); // range 0-1
             if (cpuLoad < 0) {
                 cpuLoad = 0.0; // Negative values mean unavailable
             }

@@ -19,22 +19,166 @@ import com.hasirciogluhq.easymcadmin.managers.EconomyManager;
 import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
 import com.hasirciogluhq.easymcadmin.packets.generic.player.PlayerDetailsUpdatePacket;
 import com.hasirciogluhq.easymcadmin.packets.generic.player.PlayerJoinPacket;
-import com.hasirciogluhq.easymcadmin.packets.plugin.events.economy.PlayerBalancesUpdatedPacket;
+import com.hasirciogluhq.easymcadmin.packets.plugin.events.economy.PlayerEconomyUpdatedPacket;
 import com.hasirciogluhq.easymcadmin.packets.plugin.events.player.OfflinePlayerChunkPacket;
 import com.hasirciogluhq.easymcadmin.serializers.player.PlayerDataSerializer;
 import com.hasirciogluhq.easymcadmin.transport.TransportManager;
+import java.util.concurrent.CompletableFuture;
+import com.hasirciogluhq.easymcadmin.packets.backend.rpc.inventory.PlayerInventoryResponse;
+import com.hasirciogluhq.easymcadmin.serializers.player.PlayerInventorySerializer;
+import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.inventory.Inventory;
 
 public class PlayerService {
     private TransportManager transportManager;
     private EasyMcAdmin plugin;
+    private final Map<UUID, JsonArray> previousInventories = new HashMap<>();
+    private final Map<UUID, JsonArray> previousEnderChests = new HashMap<>();
+    private final Map<UUID, String> previousInventoryHashes = new HashMap<>();
+    private final Map<UUID, String> previousEnderChestHashes = new HashMap<>();
 
     public PlayerService(EasyMcAdmin ema) {
         this.transportManager = ema.getTransportManager();
     }
 
-    public void SendPlayerInventorySyncEvent(Player p) {
-        if (!p.isOnline())
-            return;
+    /**
+     * Synchronizes the player's inventory or prepares the packet.
+     * 
+     * @param p          Player
+     * @param fullSync   Full synchronization (true) or only changes (false)
+     * @param sendPacket Should the packet be sent inside this function? (true for
+     *                   events, false for RPC return)
+     * @return A Future containing the prepared packet.
+     */
+    public CompletableFuture<Packet> SendPlayerInventorySyncEvent(Player p, boolean fullSync, boolean sendPacket) {
+        CompletableFuture<Packet> future = new CompletableFuture<>();
+
+        if (!p.isOnline()) {
+            future.complete(null);
+            return future;
+        }
+
+        // 1. Switch to the main thread for Bukkit API operations
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            try {
+                // Connection check (only important if sending a packet; not a blocker for data
+                // prep)
+                if (sendPacket && (!plugin.getTransportManager().isConnected()
+                        || !plugin.getTransportManager().isAuthenticated())) {
+                    future.complete(null);
+                    return;
+                }
+
+                // --- Data preparation and diff calculation (main thread) ---
+                String inventoryHash = PlayerInventorySerializer.calculateInventoryHash(p.getInventory());
+                String enderChestHash = PlayerInventorySerializer.calculateEnderChestHash(p.getEnderChest());
+
+                // Build JSON data via helper function
+                JsonObject inventoryData = generatePlayerInventoryData(p, fullSync);
+
+                // Create packet
+                Packet packet = new PlayerInventoryResponse(inventoryHash, enderChestHash, fullSync, inventoryData);
+
+                // 2. If the packet will be sent, send it on an async thread
+                if (sendPacket) {
+                    Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+                        try {
+                            plugin.getTransportManager().sendPacket(packet);
+                        } catch (Exception e) {
+                            plugin.getLogger().warning("Failed to send player inventory update: " + e.getMessage());
+                        }
+                    });
+                }
+
+                // 3. Return the packet (for RPC or other uses)
+                future.complete(packet);
+
+            } catch (Exception e) {
+                plugin.getLogger().warning("Error generating inventory sync: " + e.getMessage());
+                future.completeExceptionally(e);
+            }
+        });
+
+        return future;
+    }
+
+    /**
+     * Builds player inventory data (moved from listener).
+     * Must be run on the main thread.
+     */
+    private JsonObject generatePlayerInventoryData(Player player, boolean fullSync) {
+        UUID playerUUID = player.getUniqueId();
+
+        // Serialize current inventory and ender chest
+        JsonArray currentSerializedInventory = null;
+        JsonArray currentSerializedEnderChest = null;
+
+        PlayerInventory inventory = player.getInventory();
+        if (inventory != null) {
+            currentSerializedInventory = PlayerInventorySerializer.serializeInventory(inventory);
+        }
+
+        Inventory enderChest = player.getEnderChest();
+        if (enderChest != null) {
+            currentSerializedEnderChest = PlayerInventorySerializer.serializeEnderChest(enderChest);
+        }
+
+        // Calculate hashes
+        String inventoryHash = PlayerInventorySerializer.calculateInventoryHash(player.getInventory());
+        String enderChestHash = PlayerInventorySerializer.calculateEnderChestHash(player.getEnderChest());
+
+        JsonObject inventoryData = new JsonObject();
+        inventoryData.addProperty("player_uuid", playerUUID.toString());
+
+        if (fullSync) {
+            // Full sync
+            if (currentSerializedInventory != null) {
+                inventoryData.add("inventory", currentSerializedInventory);
+                previousInventories.put(playerUUID, currentSerializedInventory);
+                previousInventoryHashes.put(playerUUID, inventoryHash);
+            }
+            if (currentSerializedEnderChest != null) {
+                inventoryData.add("ender_chest", currentSerializedEnderChest);
+                previousEnderChests.put(playerUUID, currentSerializedEnderChest);
+                previousEnderChestHashes.put(playerUUID, enderChestHash);
+            }
+        } else {
+            // Diff sync
+            JsonArray previousInventory = previousInventories.get(playerUUID);
+            JsonArray previousEnderChest = previousEnderChests.get(playerUUID);
+            String previousInventoryHash = previousInventoryHashes.get(playerUUID);
+            String previousEnderChestHash = previousEnderChestHashes.get(playerUUID);
+
+            // Inventory Diff
+            boolean inventoryChanged = !inventoryHash
+                    .equals(previousInventoryHash != null ? previousInventoryHash : "");
+            if (inventoryChanged && currentSerializedInventory != null) {
+                // If no previous record exists, sending full data might be safer, but we
+                // calculate a diff here
+                JsonArray inventoryDiff = PlayerInventorySerializer.calculateDiff(previousInventory,
+                        currentSerializedInventory);
+                inventoryData.add("inventory", inventoryDiff);
+                inventoryData.addProperty("inventory_prev_hash", previousInventoryHash);
+
+                previousInventories.put(playerUUID, currentSerializedInventory);
+                previousInventoryHashes.put(playerUUID, inventoryHash);
+            }
+
+            // Ender Chest Diff
+            boolean enderChestChanged = !enderChestHash
+                    .equals(previousEnderChestHash != null ? previousEnderChestHash : "");
+            if (enderChestChanged && currentSerializedEnderChest != null) {
+                JsonArray enderChestDiff = PlayerInventorySerializer.calculateDiff(previousEnderChest,
+                        currentSerializedEnderChest);
+                inventoryData.add("ender_chest", enderChestDiff);
+                inventoryData.addProperty("ender_chest_prev_hash", previousEnderChestHash);
+
+                previousEnderChests.put(playerUUID, currentSerializedEnderChest);
+                previousEnderChestHashes.put(playerUUID, enderChestHash);
+            }
+        }
+
+        return inventoryData;
     }
 
     public void sendPlayerDetails(Player p) {
@@ -121,7 +265,7 @@ public class PlayerService {
                 Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
                     try {
                         // Send balance update packet
-                        Packet packet = new PlayerBalancesUpdatedPacket(playerBalanceData);
+                        Packet packet = new PlayerEconomyUpdatedPacket(playerBalanceData);
                         plugin.getTransportManager().sendPacket(packet);
                     } catch (Exception e) {
                         plugin.getLogger().warning("Failed to send player balance update: " + e.getMessage());
@@ -178,8 +322,8 @@ public class PlayerService {
     }
 
     // event handlers
-    // Tüm event handler lar zaten main thread dan başlıyor o yüzden main
-    // thread run'a gerek yok
+    // All event handlers already start on the main thread, so no main thread run is
+    // needed
     public void handleJoin(Player p) {
         JsonObject playerObj = PlayerDataSerializer.getPlayerDetailsPayload(p);
         playerObj.addProperty("online", true);
@@ -187,9 +331,6 @@ public class PlayerService {
         // Set last_seen to current time when player joins
         playerObj.addProperty("first_seen", p.getFirstPlayed());
         playerObj.addProperty("last_seen", System.currentTimeMillis());
-
-        // Add inventory, ender chest data for join events
-        PlayerDataSerializer.addPlayerInventoryData(playerObj, p);
 
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             Packet packet = new PlayerJoinPacket(playerObj);
@@ -206,6 +347,13 @@ public class PlayerService {
     }
 
     // helpers
+    // Cache cleanup when the player leaves (don't forget to call this)
+    public void clearPlayerInventoryCache(UUID uuid) {
+        previousInventories.remove(uuid);
+        previousEnderChests.remove(uuid);
+        previousInventoryHashes.remove(uuid);
+        previousEnderChestHashes.remove(uuid);
+    }
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> safeMap(Object o) {
@@ -241,7 +389,7 @@ public class PlayerService {
             // "players" array
             List<String> syncedUuids = safeList(data.get("players"));
 
-            // Eğer array yoksa dosyada → sıfırdan oluştur
+            // If the array doesn't exist in the file → create from scratch
             data.put("players", syncedUuids);
 
             for (OfflinePlayer op : players) {
@@ -253,7 +401,7 @@ public class PlayerService {
                     if (!syncedUuids.contains(uuid.toString())) {
                         syncedUuids.add(uuid.toString());
                         // plugin.getDataManager().saveAsync("synced_user_offline_users.json"); //
-                        // İstersen aç
+                        // Enable if desired
                     }
                 }
 
@@ -268,7 +416,7 @@ public class PlayerService {
                 playerArray.add(json);
             }
 
-            // Optional: Online oyuncular için balance send
+            // Optional: send balances for online players
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 for (OfflinePlayer op : players) {
                     if (op.isOnline()) {
@@ -284,5 +432,4 @@ public class PlayerService {
             plugin.getLogger().warning("Failed to send offline player chunk: " + e.getMessage());
         }
     }
-
 }

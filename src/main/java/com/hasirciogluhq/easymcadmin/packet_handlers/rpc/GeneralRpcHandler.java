@@ -16,11 +16,11 @@ import com.hasirciogluhq.easymcadmin.packets.generic.RpcErrorPacket;
 public class GeneralRpcHandler {
 
     /**
-     * Bu handler sadece Packet döndürür.
-     * - Hata varsa RpcErrorPacket döner
-     * - Başarı varsa GenericPacket döner
+     * This handler only returns a Packet.
+     * - On error, it returns an RpcErrorPacket
+     * - On success, it returns a GenericPacket
      * 
-     * Ana RPC router bunu sendRpcResponsePacket ile gönderecek.
+     * The main RPC router will send it with sendRpcResponsePacket.
      */
     public static CompletableFuture<Packet> handleConsoleCommandExecute(Packet packet) {
         CompletableFuture<Packet> future = new CompletableFuture<>();
@@ -32,7 +32,7 @@ public class GeneralRpcHandler {
 
         String command = packet.getPayload().get("command").getAsString();
 
-        // Bukkit main thread üzerinde çalıştır
+        // Run on the Bukkit main thread
         Bukkit.getScheduler().runTask(EasyMcAdmin.getInstance(), () -> {
             try {
                 Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
