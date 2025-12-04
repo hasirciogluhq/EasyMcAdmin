@@ -23,7 +23,7 @@ public class PlayerInventoryChangedPacket extends Packet {
     
     private static JsonObject createMetadata(String inventoryHash, String enderChestHash, boolean fullSync) {
         JsonObject metadata = new JsonObject();
-        metadata.addProperty("action", "player.inventory.changed");
+        metadata.addProperty("action", "player.inventory.updated");
         metadata.addProperty("inventory_hash", inventoryHash);
         // Always include ender chest hash if available (for validation)
         if (enderChestHash != null && !enderChestHash.isEmpty()) {
