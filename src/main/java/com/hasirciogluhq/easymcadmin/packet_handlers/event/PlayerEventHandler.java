@@ -16,6 +16,7 @@ public class PlayerEventHandler {
         }
 
         String playerUUIDStr = packet.getPayload().get("player_uuid").getAsString();
+        Boolean fullSync = packet.getPayload().get("full_sync").getAsBoolean();
 
         // Needs to run on the Bukkit main thread.
         Bukkit.getScheduler().runTask(EasyMcAdmin.getInstance(), () -> {
@@ -28,7 +29,7 @@ public class PlayerEventHandler {
                     // fullSync: true (backend requested explicit sync, so send full)
                     // sendPacket: true (event handler, so we want the packet sent)
                     EasyMcAdmin.getInstance().getServiceManager().getPlayerService()
-                            .SendPlayerInventorySyncEvent(p, true, true);
+                            .SendPlayerInventorySyncEvent(p, fullSync, true);
                 }
             } catch (Exception e) {
                 EasyMcAdmin.getInstance().getLogger()

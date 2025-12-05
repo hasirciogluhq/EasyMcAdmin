@@ -20,11 +20,12 @@ import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
 import com.hasirciogluhq.easymcadmin.packets.generic.player.PlayerDetailsUpdatePacket;
 import com.hasirciogluhq.easymcadmin.packets.generic.player.PlayerJoinPacket;
 import com.hasirciogluhq.easymcadmin.packets.plugin.events.economy.PlayerEconomyUpdatedPacket;
+import com.hasirciogluhq.easymcadmin.packets.plugin.events.inventory.PlayerInventorySyncPacket;
 import com.hasirciogluhq.easymcadmin.packets.plugin.events.player.OfflinePlayerChunkPacket;
 import com.hasirciogluhq.easymcadmin.serializers.player.PlayerDataSerializer;
 import com.hasirciogluhq.easymcadmin.transport.TransportManager;
 import java.util.concurrent.CompletableFuture;
-import com.hasirciogluhq.easymcadmin.packets.backend.rpc.inventory.PlayerInventoryResponse;
+
 import com.hasirciogluhq.easymcadmin.serializers.player.PlayerInventorySerializer;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.Inventory;
@@ -77,7 +78,7 @@ public class PlayerService {
                 JsonObject inventoryData = generatePlayerInventoryData(p, fullSync);
 
                 // Create packet
-                Packet packet = new PlayerInventoryResponse(inventoryHash, enderChestHash, fullSync, inventoryData);
+                Packet packet = new PlayerInventorySyncPacket(inventoryHash, enderChestHash, fullSync, inventoryData);
 
                 // 2. If the packet will be sent, send it on an async thread
                 if (sendPacket) {
