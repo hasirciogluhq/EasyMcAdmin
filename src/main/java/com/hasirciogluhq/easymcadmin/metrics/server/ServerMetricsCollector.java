@@ -79,8 +79,8 @@ public class ServerMetricsCollector {
         String bukkitVersion = Bukkit.getBukkitVersion(); // 1.21.1-R0.1-SNAPSHOT
         String minecraftVersion = getCleanMinecraftVersion(); // 1.21.1
 
-        data.put("onlinePlayers", online);
-        data.put("maxPlayers", max);
+        data.put("online_players", online);
+        data.put("max_players", max);
         
         // Memory metrics (detailed)
         data.put("memory_total_mb", memoryTotalMB);
@@ -97,15 +97,9 @@ public class ServerMetricsCollector {
         data.put("tps_used", tpsUsed);
         data.put("tps_used_percentage", tpsUsedPercentage);
         
-        // Legacy fields for backward compatibility (deprecated)
-        data.put("memoryUsedMB", memoryUsedMB);
-        data.put("memoryMaxMB", memoryTotalMB);
-        data.put("cpuUsage", cpuUsed);
-        data.put("tps", tpsUsed);
-        
-        data.put("serverName", serverName);
-        data.put("minecraftVersion", minecraftVersion);
-        data.put("bukkitVersion", bukkitVersion);
+        data.put("server_name", serverName);
+        data.put("minecraft_version", minecraftVersion);
+        data.put("bukkit_version", bukkitVersion);
         data.put("timestamp", System.currentTimeMillis());
 
         return data;
