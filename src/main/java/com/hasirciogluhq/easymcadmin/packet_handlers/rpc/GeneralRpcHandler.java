@@ -51,7 +51,6 @@ public class GeneralRpcHandler {
                         responsePayload);
 
                 future.complete(response);
-
             } catch (Exception e) {
                 // Error packet
                 RpcErrorPacket err = new RpcErrorPacket("Failed to execute command: " + e.getMessage());

@@ -28,6 +28,7 @@ public class RpcPacketHandler {
         rpcHandlers.put("plugin.player.request", PlayerRpcHandler::handlePlayerRequest);
         rpcHandlers.put("plugin.player.inventory.request", PlayerRpcHandler::handlePlayerInventoryRequest);
         rpcHandlers.put("plugin.server.console.execute", GeneralRpcHandler::handleConsoleCommandExecute);
+        rpcHandlers.put("plugin.economy.config.set", GeneralRpcHandler::handleEconomyConfigSet);
 
         // rpcHandlers.put("plugin.ping", MyHandler::handlePingSync); // Returns Packet
     }

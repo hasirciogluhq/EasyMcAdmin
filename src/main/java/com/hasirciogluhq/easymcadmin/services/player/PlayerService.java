@@ -23,23 +23,20 @@ import com.hasirciogluhq.easymcadmin.packets.plugin.events.economy.PlayerEconomy
 import com.hasirciogluhq.easymcadmin.packets.plugin.events.inventory.PlayerInventorySyncPacket;
 import com.hasirciogluhq.easymcadmin.packets.plugin.events.player.OfflinePlayerChunkPacket;
 import com.hasirciogluhq.easymcadmin.serializers.player.PlayerDataSerializer;
-import com.hasirciogluhq.easymcadmin.transport.TransportManager;
-import java.util.concurrent.CompletableFuture;
-
 import com.hasirciogluhq.easymcadmin.serializers.player.PlayerInventorySerializer;
+import java.util.concurrent.CompletableFuture;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.Inventory;
 
 public class PlayerService {
-    private TransportManager transportManager;
-    private EasyMcAdmin plugin;
+    private final EasyMcAdmin plugin;
     private final Map<UUID, JsonArray> previousInventories = new HashMap<>();
     private final Map<UUID, JsonArray> previousEnderChests = new HashMap<>();
     private final Map<UUID, String> previousInventoryHashes = new HashMap<>();
     private final Map<UUID, String> previousEnderChestHashes = new HashMap<>();
 
     public PlayerService(EasyMcAdmin ema) {
-        this.transportManager = ema.getTransportManager();
+        this.plugin = ema;
     }
 
     /**
