@@ -25,6 +25,8 @@ import com.hasirciogluhq.easymcadmin.packets.plugin.events.player.OfflinePlayerC
 import com.hasirciogluhq.easymcadmin.serializers.player.PlayerDataSerializer;
 import com.hasirciogluhq.easymcadmin.serializers.player.PlayerInventorySerializer;
 import java.util.concurrent.CompletableFuture;
+import java.util.logging.Level;
+
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.Inventory;
 
@@ -323,6 +325,7 @@ public class PlayerService {
     // All event handlers already start on the main thread, so no main thread run is
     // needed
     public void handleJoin(Player p) {
+        plugin.getLogger().log(Level.INFO, "Sending player join event");
         JsonObject playerObj = PlayerDataSerializer.getPlayerDetailsPayload(p);
         playerObj.addProperty("online", true);
 

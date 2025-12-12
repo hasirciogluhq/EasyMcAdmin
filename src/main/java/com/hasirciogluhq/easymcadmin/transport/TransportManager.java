@@ -4,7 +4,9 @@ import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.logging.Level;
 
+import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
 import com.hasirciogluhq.easymcadmin.packets.generic.Packet;
 import com.hasirciogluhq.easymcadmin.rpc.RpcHandler;
 import com.hasirciogluhq.easymcadmin.rpc.RpcStore;
@@ -33,11 +35,15 @@ public class TransportManager {
     public void sendPacket(Packet packet) throws IOException {
         // Only allow auth packets if not authenticated
         if (!isAuthenticated() && !packet.isAuthPacket()) {
+            EasyMcAdmin.getInstance().getLogger().log(Level.INFO,
+                    "PACKET SKIPPING DUE UNAUTHENTICATED AND NOT AUTH PACKET action:", packet.getAction());
             return;
         }
 
         // Don't allow auth packets if already authenticated
         if (isAuthenticated() && packet.isAuthPacket()) {
+            EasyMcAdmin.getInstance().getLogger().log(Level.INFO,
+                    "PACKET SKIPPING DUE AUTH PACKED AND AUTHENTICATED action:", packet.getAction());
             return;
         }
 
@@ -68,21 +74,21 @@ public class TransportManager {
      * Similar to Go backend's SendRpcRequestPacket
      * 
      * @param packet RPC request packet
-     * @return CompletableFuture that completes with response packet or timeout exception
+     * @return CompletableFuture that completes with response packet or timeout
+     *         exception
      */
     public CompletableFuture<Packet> sendRpcRequestPacket(Packet packet) {
         CompletableFuture<Packet> future = new CompletableFuture<>();
-        
+
         // Register handler in RPC store
         RpcStore rpcStore = RpcStore.getRpcStore();
         rpcStore.registerHandler(packet, new RpcHandler(
-            responsePacket -> {
-                rpcStore.removeHandler(packet);
-                future.complete(responsePacket);
-            },
-            30000, // 30 seconds timeout
-            System.currentTimeMillis()
-        ));
+                responsePacket -> {
+                    rpcStore.removeHandler(packet);
+                    future.complete(responsePacket);
+                },
+                30000, // 30 seconds timeout
+                System.currentTimeMillis()));
 
         // Send the packet
         try {
@@ -108,7 +114,7 @@ public class TransportManager {
      * Send RPC response packet
      * Similar to Go backend's SendRpcResponsePacket
      * 
-     * @param requestPacket Original request packet
+     * @param requestPacket  Original request packet
      * @param responsePacket Response packet to send
      * @throws IOException if sending fails
      */
