@@ -18,4 +18,13 @@ public interface TransportInterface {
     void sendPacket(Packet packet);
 
     void setTransportListener(TransportListener transportListener);
+
+    /**
+     * Inform the transport about current authentication state. Implementations
+     * may use this to filter incoming/outgoing packets when unauthenticated.
+     * Default implementation is a no-op for transports that don't need it.
+     */
+    default void setAuthenticated(boolean authenticated) {
+        // no-op by default
+    }
 }

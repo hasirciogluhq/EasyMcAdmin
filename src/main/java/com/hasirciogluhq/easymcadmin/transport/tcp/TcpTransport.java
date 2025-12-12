@@ -39,6 +39,8 @@ public class TcpTransport implements TransportInterface {
     private static final java.util.concurrent.atomic.AtomicInteger enqueueFailures = new java.util.concurrent.atomic.AtomicInteger(0);
     private static volatile TcpTransport INSTANCE = null;
     private Gson gson;
+    // Transport-level auth flag used to filter packets when unauthenticated
+    private volatile boolean transportAuthenticated = false;
 
     public TcpTransport(EasyMcAdmin plugin, String host, int port) {
         this.plugin = plugin;
@@ -113,11 +115,23 @@ public class TcpTransport implements TransportInterface {
                         // Deserialize JSON to Packet
                         try {
                             Packet packet = new GenericPacket(jsonString);
-                            packetQueue.offer(packet);
+                            // Filter incoming packets at transport layer: if not authenticated,
+                            // only allow auth-related packets (auth request/response or RPC responses).
+                            boolean allowIncoming = true;
+                            if (!transportAuthenticated) {
+                                allowIncoming = packet.isAuthPacket() || packet.isRpcResponse();
+                            }
 
-                            // Notify listener if available
-                            if (transportListener != null) {
-                                transportListener.onPacket(packet);
+                            if (allowIncoming) {
+                                packetQueue.offer(packet);
+
+                                // Notify listener if available
+                                if (transportListener != null) {
+                                    transportListener.onPacket(packet);
+                                }
+                            } else {
+                                // Drop packet and log at fine level
+                                plugin.getLogger().fine("Dropped incoming packet while unauthenticated: " + packet.getAction());
                             }
                         } catch (Exception e) {
                             if (transportListener != null) {
@@ -221,6 +235,7 @@ public class TcpTransport implements TransportInterface {
     public void disconnect() {
         try {
             isConnected = false;
+            transportAuthenticated = false;
             
             // Interrupt connection thread if it's waiting
             if (connectionThread != null && connectionThread.isAlive()) {
@@ -280,6 +295,15 @@ public class TcpTransport implements TransportInterface {
     }
 
     public void sendPacket(Packet packet) {
+        // Enforce transport-level auth filtering: if transport is not authenticated
+        // only allow outgoing auth packets.
+        if (!transportAuthenticated && !packet.isAuthPacket()) {
+            if (transportListener != null) {
+                transportListener.onError(new IOException("Transport not authenticated - outgoing packet blocked"));
+            }
+            return;
+        }
+
         if (!isConnected() || dataOutputStream == null) {
             if (transportListener != null) {
                 transportListener.onError(new IOException("Cannot send packet: not connected"));
@@ -322,6 +346,11 @@ public class TcpTransport implements TransportInterface {
         }
         // unregister telemetry instance
         INSTANCE = null;
+    }
+
+    @Override
+    public void setAuthenticated(boolean authenticated) {
+        this.transportAuthenticated = authenticated;
     }
 
     public static int getOutgoingQueueDepth() {

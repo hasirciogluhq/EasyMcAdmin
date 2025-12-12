@@ -110,6 +110,8 @@ public abstract class Packet {
     }
 
     public boolean isAuthPacket() {
-        return metadata.has("action") && metadata.get("action").getAsString().equals("plugin.auth.request");
+        return metadata.has("action") &&
+                (metadata.get("action").getAsString().equals("plugin.auth.request") ||
+                        metadata.get("action").getAsString().equals("plugin.auth.response"));
     }
 }

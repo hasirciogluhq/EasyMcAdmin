@@ -84,32 +84,8 @@ public class TransportHandler implements TransportListener {
 
     @Override
     public void onConnect() {
-        // Send auth RPC request, onTransportConnectedAndAuthenticated will be called
-        // after successful authentication in onAuthSuccess()
-        Packet authPacket = new GenericAuthPacket(
-                EasyMcAdmin.getInstance().getConfig().getString("server.token", "1234567890"));
-
-        Bukkit.getServer().getScheduler().runTaskLater(EasyMcAdmin.getInstance(), () -> {
-            try {
-                // Send RPC request and wait for response
-                manager.sendRpcRequestPacket(authPacket)
-                        .thenAccept(responsePacket -> {
-                            // Handle auth response
-                            onAuthResponse(responsePacket);
-                        })
-                        .exceptionally(throwable -> {
-                            EasyMcAdmin.getInstance().getLogger()
-                                    .warning("Auth request failed: " + throwable.getMessage());
-                            onAuthFailure(throwable.getMessage());
-                            return null;
-                        });
-            } catch (Exception e) {
-                EasyMcAdmin.getInstance().getLogger()
-                        .warning("Error while sending auth packet: " + e.getMessage());
-                onAuthFailure(e.getMessage());
-            }
-        }, 2L);
-
+        // Transport connected. Authentication and any retries are handled by StartupManager.
+        EasyMcAdmin.getInstance().getLogger().info("Transport connected (handler notified)");
     }
 
     @Override

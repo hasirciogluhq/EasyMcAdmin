@@ -93,6 +93,10 @@ public class TransportManager {
 
     public void setAuthenticated(boolean isAuthenticated) {
         this.isAuthenticated = isAuthenticated;
+        try {
+            transport.setAuthenticated(isAuthenticated);
+        } catch (Throwable ignored) {
+        }
     }
 
     /**

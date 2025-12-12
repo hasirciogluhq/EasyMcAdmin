@@ -31,4 +31,18 @@ server:
 data:
   # Auto-save interval in seconds (minimum 5s). Default: 120 (2 minutes)
   autosave_interval_seconds: 120
+  # Debounce in milliseconds for grouped saves when many mutations occur
+  # Reduces IO by aggregating frequent changes. Default: 1000 (1s)
+  save_debounce_millis: 1000
+
+# Startup orchestration settings
+startup:
+  # Initial delay for connection attempts in seconds
+  connect_initial_delay_seconds: 1
+  # Maximum backoff for connection attempts in seconds
+  connect_max_backoff_seconds: 60
+  # How often to retry auth in seconds when unauthenticated
+  auth_retry_interval_seconds: 10
+  # How long to wait for auth after connection (seconds) before giving up
+  auth_wait_max_seconds: 30
 

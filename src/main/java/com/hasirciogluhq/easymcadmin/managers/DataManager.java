@@ -21,6 +21,8 @@ public class DataManager {
 
     // file lock (required for concurrent file IO)
     private final Object fileLock = new Object();
+    // pending debounced save tasks per file
+    private final Map<String, BukkitRunnable> pendingSaveTasks = new ConcurrentHashMap<>();
 
     public DataManager(EasyMcAdmin plugin) {
         this.plugin = plugin;
@@ -168,6 +170,14 @@ public class DataManager {
             }
             autoSaveTask = null;
         }
+        // cancel any pending debounced saves
+        for (BukkitRunnable r : pendingSaveTasks.values()) {
+            try {
+                r.cancel();
+            } catch (Exception ignored) {
+            }
+        }
+        pendingSaveTasks.clear();
     }
 
     /**
@@ -175,8 +185,56 @@ public class DataManager {
      */
     public void saveAll() {
         synchronized (fileLock) {
+            // cancel pending debounced saves and save synchronously
             for (String fileName : fileCache.keySet()) {
+                cancelPendingSave(fileName);
                 save(fileName);
+            }
+        }
+    }
+
+    /**
+     * Schedule a debounced save for the given file. Repeated calls within the
+     * debounce window will cancel the previous scheduled save and schedule a new
+     * one, effectively aggregating rapid updates.
+     */
+    public void scheduleDebouncedSave(String fileName) {
+        // read debounce from config (milliseconds)
+        int debounceMs = 1000;
+        try {
+            debounceMs = Math.max(50, plugin.getConfig().getInt("data.save_debounce_millis", 1000));
+        } catch (Exception ignored) {
+        }
+
+        // convert to ticks (50 ms per tick)
+        long ticks = Math.max(1L, debounceMs / 50L);
+
+        // cancel previous task if exists
+        cancelPendingSave(fileName);
+
+        BukkitRunnable task = new BukkitRunnable() {
+            @Override
+            public void run() {
+                try {
+                    save(fileName);
+                } catch (Exception e) {
+                    plugin.getLogger().warning("Debounced save failed for '" + fileName + "': " + e.getMessage());
+                } finally {
+                    pendingSaveTasks.remove(fileName);
+                }
+            }
+        };
+
+        pendingSaveTasks.put(fileName, task);
+        task.runTaskLaterAsynchronously(plugin, ticks);
+    }
+
+    private void cancelPendingSave(String fileName) {
+        BukkitRunnable prev = pendingSaveTasks.remove(fileName);
+        if (prev != null) {
+            try {
+                prev.cancel();
+            } catch (Exception ignored) {
             }
         }
     }
@@ -206,7 +264,7 @@ public class DataManager {
         public V put(K key, V value) {
             V v = super.put(key, value);
             try {
-                manager.saveAsync(fileName);
+                manager.scheduleDebouncedSave(fileName);
             } catch (Exception ignored) {
             }
             return v;
@@ -216,7 +274,7 @@ public class DataManager {
         public void putAll(Map<? extends K, ? extends V> m) {
             super.putAll(m);
             try {
-                manager.saveAsync(fileName);
+                manager.scheduleDebouncedSave(fileName);
             } catch (Exception ignored) {
             }
         }
@@ -225,7 +283,7 @@ public class DataManager {
         public V remove(Object key) {
             V v = super.remove(key);
             try {
-                manager.saveAsync(fileName);
+                manager.scheduleDebouncedSave(fileName);
             } catch (Exception ignored) {
             }
             return v;
@@ -235,7 +293,7 @@ public class DataManager {
         public void clear() {
             super.clear();
             try {
-                manager.saveAsync(fileName);
+                manager.scheduleDebouncedSave(fileName);
             } catch (Exception ignored) {
             }
         }
@@ -257,47 +315,68 @@ public class DataManager {
         @Override
         public boolean add(E e) {
             boolean r = super.add(e);
-            try { manager.saveAsync(fileName); } catch (Exception ignored) {}
+            try {
+                manager.scheduleDebouncedSave(fileName);
+            } catch (Exception ignored) {
+            }
             return r;
         }
 
         @Override
         public void add(int index, E element) {
             super.add(index, element);
-            try { manager.saveAsync(fileName); } catch (Exception ignored) {}
+            try {
+                manager.scheduleDebouncedSave(fileName);
+            } catch (Exception ignored) {
+            }
         }
 
         @Override
         public boolean addAll(Collection<? extends E> c) {
             boolean r = super.addAll(c);
-            try { manager.saveAsync(fileName); } catch (Exception ignored) {}
+            try {
+                manager.scheduleDebouncedSave(fileName);
+            } catch (Exception ignored) {
+            }
             return r;
         }
 
         @Override
         public E remove(int index) {
             E v = super.remove(index);
-            try { manager.saveAsync(fileName); } catch (Exception ignored) {}
+            try {
+                manager.scheduleDebouncedSave(fileName);
+            } catch (Exception ignored) {
+            }
             return v;
         }
 
         @Override
         public boolean remove(Object o) {
             boolean r = super.remove(o);
-            try { manager.saveAsync(fileName); } catch (Exception ignored) {}
+            try {
+                manager.scheduleDebouncedSave(fileName);
+            } catch (Exception ignored) {
+            }
             return r;
         }
 
         @Override
         public void clear() {
             super.clear();
-            try { manager.saveAsync(fileName); } catch (Exception ignored) {}
+            try {
+                manager.scheduleDebouncedSave(fileName);
+            } catch (Exception ignored) {
+            }
         }
 
         @Override
         public E set(int index, E element) {
             E v = super.set(index, element);
-            try { manager.saveAsync(fileName); } catch (Exception ignored) {}
+            try {
+                manager.scheduleDebouncedSave(fileName);
+            } catch (Exception ignored) {
+            }
             return v;
         }
     }
@@ -315,7 +394,7 @@ public class DataManager {
         } else {
             fileCache.put(fileName, data != null ? data : new ConcurrentHashMap<>());
         }
-        saveAsync(fileName);
+        scheduleDebouncedSave(fileName);
     }
 
     /**
@@ -344,6 +423,8 @@ public class DataManager {
 
         return value;
     }
+
+    /*
      * Returns the data directly as a Map.
      */
     @SuppressWarnings("unchecked")
@@ -375,7 +456,7 @@ public class DataManager {
         data.put(key, value);
         // Persist change asynchronously so callers don't need to call save explicitly.
         try {
-            saveAsync(fileName);
+            scheduleDebouncedSave(fileName);
         } catch (Exception ignored) {
         }
     }

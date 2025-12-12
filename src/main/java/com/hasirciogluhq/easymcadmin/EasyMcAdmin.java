@@ -14,6 +14,7 @@ import com.hasirciogluhq.easymcadmin.transport.TransportInterface;
 import com.hasirciogluhq.easymcadmin.transport.TransportManager;
 import com.hasirciogluhq.easymcadmin.transport.tcp.TcpTransport;
 import com.hasirciogluhq.easymcadmin.util.ConsoleOutputHandler;
+import com.hasirciogluhq.easymcadmin.managers.StartupManager;
 
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -42,6 +43,7 @@ public class EasyMcAdmin extends JavaPlugin {
     private DispatcherManager dispatcherManager;
     private ServiceManager serviceManager;
     private DataManager dataManager;
+    private StartupManager startupManager;
 
     private EconomyManager economyManager;
 
@@ -109,8 +111,9 @@ public class EasyMcAdmin extends JavaPlugin {
         // Register event listeners
         this.eventListenerManager.RegisterAllListeners();
 
-        // Start automatic connection task (20 ticks interval)
-        startConnectionTask();
+        // Start orchestrated startup flow
+        startupManager = new StartupManager(this);
+        startupManager.start();
 
         getLogger().info("Easy MC Admin has been enabled!");
         getLogger().info("Version: " + getDescription().getVersion());
