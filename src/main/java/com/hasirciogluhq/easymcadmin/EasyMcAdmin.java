@@ -118,14 +118,6 @@ public class EasyMcAdmin extends JavaPlugin {
         getLogger().info("Easy MC Admin has been enabled!");
         getLogger().info("Version: " + getDescription().getVersion());
         getLogger().info("Server ID: " + serverId);
-
-        // Try initial connection if token is set
-        if (getConfig().getString("server.token", "").isEmpty()) {
-            getLogger().warning(
-                    "No token set! Use /easymcadmin setToken <token> to set authentication token.");
-        } else {
-            getLogger().info("Token found, attempting to connect...");
-        }
     }
 
     @Override

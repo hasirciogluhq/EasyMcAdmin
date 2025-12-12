@@ -9,7 +9,8 @@ import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * StartupManager orchestrates plugin startup phases:
@@ -23,8 +24,26 @@ public class StartupManager {
     private final TransportManager transportManager;
     private final ServiceManager serviceManager;
 
-    private volatile boolean connecting = false;
-    private volatile boolean started = false;
+    // Explicit startup state machine
+    private enum State {
+        DISCONNECTED,
+        CONNECTING,
+        CONNECTED,
+        AUTHENTICATED,
+        SYNCING,
+        READY
+    }
+
+    private final AtomicReference<State> state = new AtomicReference<>(State.DISCONNECTED);
+
+    // Connection attempt guard (only one concurrent connect attempt)
+    private final AtomicBoolean connectingFlag = new AtomicBoolean(false);
+
+    // Auth attempt guard (only one concurrent auth RPC outstanding)
+    private final AtomicBoolean authInProgress = new AtomicBoolean(false);
+
+    // One-shot marker for the initial sync (exactly-once)
+    private final AtomicBoolean syncStarted = new AtomicBoolean(false);
 
     // Backoff state
     private int connectDelaySeconds;
@@ -48,13 +67,48 @@ public class StartupManager {
 
         // Schedule periodic auth check (will send auth if connected but unauthenticated)
         int authInterval = Math.max(5, plugin.getConfig().getInt("startup.auth_retry_interval_seconds", 10));
+        // Periodic watcher: if connected but not authenticated, try auth; if already
+        // authenticated and we haven't started sync, ensure we transition to AUTHENTICATED
         new BukkitRunnable() {
             @Override
             public void run() {
                 try {
-                    if (transportManager.isConnected() && !transportManager.isAuthenticated()) {
-                        plugin.getLogger().info("StartupManager: attempting auth check (scheduled)");
-                        attemptAuth();
+                    // If transport reports authenticated, ensure our state reflects that
+                    if (transportManager.isAuthenticated()) {
+                        // Try to move to AUTHENTICATED if we are CONNECTED (or CONNECTING)
+                        State prev = state.get();
+                        if (prev == State.CONNECTED || prev == State.CONNECTING) {
+                            boolean moved = state.compareAndSet(prev, State.AUTHENTICATED);
+                            if (moved) {
+                                plugin.getLogger().info("StartupManager: observed transport authenticated (watcher), transitioning to AUTHENTICATED");
+                                // ensure transportManager authenticated flag set (idempotent)
+                                transportManager.setAuthenticated(true);
+                                startSyncIfNeeded();
+                            }
+                        } else if (prev == State.AUTHENTICATED) {
+                            // we may have missed starting sync previously
+                            startSyncIfNeeded();
+                        }
+                    } else {
+                        // Not authenticated: if not connected, ensure we transition to DISCONNECTED
+                        if (!transportManager.isConnected()) {
+                            State prev = state.getAndSet(State.DISCONNECTED);
+                            if (prev != State.DISCONNECTED) {
+                                plugin.getLogger().info("StartupManager: detected transport disconnected, scheduling reconnect");
+                                // clear any ongoing guards so reconnect may proceed
+                                authInProgress.set(false);
+                                connectingFlag.set(false);
+                                // schedule reconnect attempt
+                                attemptConnectWithBackoff();
+                            }
+                        } else {
+                            // Connected but not authenticated: try an auth attempt if appropriate
+                            State s = state.get();
+                            if (s == State.CONNECTED || s == State.CONNECTING) {
+                                plugin.getLogger().fine("StartupManager: watcher initiating auth attempt");
+                                attemptAuth();
+                            }
+                        }
                     }
                 } catch (Throwable t) {
                     plugin.getLogger().warning("StartupManager auth-check task error: " + t.getMessage());
@@ -64,67 +118,107 @@ public class StartupManager {
     }
 
     private void attemptConnectWithBackoff() {
-        if (connecting || transportManager.isConnected()) return;
-        connecting = true;
+        // If already connected, reflect state and return
+        if (transportManager.isConnected()) {
+            state.set(State.CONNECTED);
+            return;
+        }
+
+        // Only one concurrent connect attempt
+        if (!connectingFlag.compareAndSet(false, true)) return;
 
         int maxBackoff = Math.max(5, plugin.getConfig().getInt("startup.connect_max_backoff_seconds", 60));
 
-        plugin.getLogger().info("StartupManager: attempting initial connect (backoff aware)");
+        plugin.getLogger().info("StartupManager: attempting connect (backoff aware)");
 
         // Attempt connect asynchronously to avoid blocking main thread
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
+                // mark state as CONNECTING if we were DISCONNECTED
+                state.updateAndGet(s -> (s == State.DISCONNECTED) ? State.CONNECTING : s);
+
                 transportManager.connect();
                 plugin.getLogger().info("StartupManager: transport.connect() returned");
+
+                // reflect connected state
+                state.updateAndGet(s -> (s == State.CONNECTING || s == State.DISCONNECTED) ? State.CONNECTED : s);
+
                 // Try auth immediately after connect (in addition to the periodic auth retry).
-                // This reduces the chance that waitForAuthThenSync() times out before any auth
-                // attempt is made.
                 try {
                     attemptAuth();
                 } catch (Throwable ignored) {
                 }
-                // Continue to wait for auth and run initial sync when it becomes available.
-                waitForAuthThenSync();
-                connecting = false;
+
+                // We will also ensure sync starts when auth completes via startSyncIfNeeded()
+                connectingFlag.set(false);
                 // reset backoff
                 connectDelaySeconds = Math.max(1, plugin.getConfig().getInt("startup.connect_initial_delay_seconds", 1));
             } catch (Exception e) {
                 plugin.getLogger().warning("StartupManager: transport connect failed: " + e.getMessage());
-                connecting = false;
-                // schedule next attempt with exponential backoff
-                int nextDelay = Math.min(maxBackoff, Math.max(1, connectDelaySeconds * 2));
-                connectDelaySeconds = nextDelay;
-                plugin.getLogger().info("StartupManager: scheduling reconnect in " + nextDelay + "s");
-                new BukkitRunnable() {
-                    @Override
-                    public void run() {
-                        attemptConnectWithBackoff();
-                    }
-                }.runTaskLaterAsynchronously(plugin, 20L * nextDelay);
+                connectingFlag.set(false);
+                // Only schedule reconnect if we are not already authenticated/ready
+                State cur = state.get();
+                if (cur != State.READY && cur != State.SYNCING && cur != State.AUTHENTICATED) {
+                    state.set(State.DISCONNECTED);
+                    int nextDelay = Math.min(maxBackoff, Math.max(1, connectDelaySeconds * 2));
+                    connectDelaySeconds = nextDelay;
+                    plugin.getLogger().info("StartupManager: scheduling reconnect in " + nextDelay + "s");
+                    new BukkitRunnable() {
+                        @Override
+                        public void run() {
+                            attemptConnectWithBackoff();
+                        }
+                    }.runTaskLaterAsynchronously(plugin, 20L * nextDelay);
+                }
             }
         });
     }
 
     private void attemptAuth() {
+        // Only attempt auth when connected and not already authenticated
         if (!transportManager.isConnected()) return;
+
+        State cur = state.get();
+        if (cur != State.CONNECTED && cur != State.CONNECTING) return;
+
+        if (transportManager.isAuthenticated()) {
+            // Transport already says authenticated; ensure state transition and start sync
+            boolean moved = state.compareAndSet(State.CONNECTED, State.AUTHENTICATED) || state.compareAndSet(State.CONNECTING, State.AUTHENTICATED);
+            if (moved || state.get() == State.AUTHENTICATED) {
+                transportManager.setAuthenticated(true);
+                startSyncIfNeeded();
+            }
+            return;
+        }
+
+        // Only one outstanding auth RPC
+        if (!authInProgress.compareAndSet(false, true)) return;
 
         try {
             GenericAuthPacket authPacket = new GenericAuthPacket(plugin.getConfig().getString("server.token", ""));
-            CompletableFuture<?> fut = transportManager.sendRpcRequestPacket(authPacket);
+            CompletableFuture<com.hasirciogluhq.easymcadmin.packets.generic.Packet> fut = transportManager.sendRpcRequestPacket(authPacket);
+
             fut.orTimeout(10, TimeUnit.SECONDS).whenComplete((resp, thr) -> {
+                authInProgress.set(false);
                 if (thr != null) {
                     plugin.getLogger().warning("StartupManager: auth request failed: " + thr.getMessage());
                     return;
                 }
 
                 try {
-                    if (resp instanceof com.hasirciogluhq.easymcadmin.packets.generic.Packet) {
-                        GenericAuthPacketResponse gar = new GenericAuthPacketResponse((com.hasirciogluhq.easymcadmin.packets.generic.Packet) resp);
+                    if (resp != null) {
+                        GenericAuthPacketResponse gar = new GenericAuthPacketResponse(resp);
                         if (gar.isSuccess()) {
-                            plugin.getLogger().info("StartupManager: auth success via direct auth attempt");
+                            plugin.getLogger().info("StartupManager: auth success via auth RPC");
+                            // Mark transport manager as authenticated (idempotent)
                             transportManager.setAuthenticated(true);
                             plugin.setServerId(gar.getServerId());
-                            onAuthenticated();
+
+                            // Transition to AUTHENTICATED only once
+                            boolean transitioned = state.compareAndSet(State.CONNECTED, State.AUTHENTICATED) || state.compareAndSet(State.CONNECTING, State.AUTHENTICATED) || state.get() == State.AUTHENTICATED;
+                            if (transitioned) {
+                                startSyncIfNeeded();
+                            }
                         } else {
                             plugin.getLogger().warning("StartupManager: auth rejected: " + gar.getMessage());
                         }
@@ -134,68 +228,74 @@ public class StartupManager {
                 }
             });
         } catch (Exception e) {
+            authInProgress.set(false);
             plugin.getLogger().warning("StartupManager: exception while attempting auth: " + e.getMessage());
         }
     }
 
-    private void waitForAuthThenSync() {
-        // Poll for auth state with timeout. If auth becomes true, proceed to sync.
-        int maxWaitSeconds = Math.max(5, plugin.getConfig().getInt("startup.auth_wait_max_seconds", 30));
+    /**
+     * Start the initial sync exactly once. This transitions the state from
+     * AUTHENTICATED -> SYNCING -> READY and invokes the plugin hook when done.
+     */
+    private void startSyncIfNeeded() {
+        // Ensure we only start sync once
+        if (!syncStarted.compareAndSet(false, true)) {
+            return;
+        }
 
-        plugin.getLogger().info("StartupManager: waiting up to " + maxWaitSeconds + "s for authentication");
-
-        new BukkitRunnable() {
-            int waited = 0;
-
-            @Override
-            public void run() {
-                if (transportManager.isAuthenticated()) {
-                    plugin.getLogger().info("StartupManager: detected authenticated state");
-                    this.cancel();
-                    onAuthenticated();
-                    return;
-                }
-
-                if (!transportManager.isConnected()) {
-                    plugin.getLogger().warning("StartupManager: lost connection while waiting for auth");
-                    this.cancel();
-                    attemptConnectWithBackoff();
-                    return;
-                }
-
-                waited += 1;
-                if (waited >= maxWaitSeconds) {
-                    plugin.getLogger().warning("StartupManager: auth not completed within " + maxWaitSeconds + "s, will rely on periodic auth attempts");
-                    this.cancel();
-                    return;
-                }
-            }
-        }.runTaskTimerAsynchronously(plugin, 20L, 20L);
-    }
-
-    private void onAuthenticated() {
-        // Ensure we only run initial sync once
-        if (started) return;
-        started = true;
+        // Only proceed if we're in AUTHENTICATED state (or already SYNCING/READY)
+        boolean moved = state.compareAndSet(State.AUTHENTICATED, State.SYNCING) || state.get() == State.SYNCING || state.get() == State.READY;
+        if (!moved) {
+            // If not in authenticated state, we shouldn't start sync now. Reset syncStarted
+            syncStarted.set(false);
+            return;
+        }
 
         plugin.getLogger().info("StartupManager: running initial synchronization (online -> offline)");
 
-        // Send online players first
-        try {
-            serviceManager.getPlayerService().syncOnlinePlayers();
-        } catch (Exception e) {
-            plugin.getLogger().warning("StartupManager: failed to sync online players: " + e.getMessage());
-        }
+        // Run online sync asynchronously and chain offline sync afterwards
+        CompletableFuture<Void> onlineFuture = new CompletableFuture<>();
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                try {
+                    serviceManager.getPlayerService().syncOnlinePlayers();
+                    onlineFuture.complete(null);
+                } catch (Throwable t) {
+                    onlineFuture.completeExceptionally(t);
+                }
+            }
+        }.runTaskAsynchronously(plugin);
 
-        // Then send offline chunks
-        try {
-            serviceManager.getPlayerService().syncOfflinePlayers();
-        } catch (Exception e) {
-            plugin.getLogger().warning("StartupManager: failed to sync offline players: " + e.getMessage());
-        }
+        CompletableFuture<Void> chain = onlineFuture.thenCompose(v -> {
+            CompletableFuture<Void> offlineFuture = new CompletableFuture<>();
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    try {
+                        serviceManager.getPlayerService().syncOfflinePlayers();
+                        offlineFuture.complete(null);
+                    } catch (Throwable t) {
+                        offlineFuture.completeExceptionally(t);
+                    }
+                }
+            }.runTaskAsynchronously(plugin);
+            return offlineFuture;
+        });
 
-        // Normal mode can now run — other systems can rely on this signal
-        plugin.getLogger().info("StartupManager: initial synchronization complete, normal processing enabled");
-        plugin.onTransportConnectedAndAuthenticated();
+        chain.whenComplete((v, thr) -> {
+            if (thr != null) {
+                plugin.getLogger().warning("StartupManager: initial synchronization failed: " + thr.getMessage());
+            }
+
+            state.set(State.READY);
+            plugin.getLogger().info("StartupManager: initial synchronization complete, normal processing enabled");
+            // Notify plugin that transport is connected and authenticated and initial sync done
+            try {
+                plugin.onTransportConnectedAndAuthenticated();
+            } catch (Throwable t) {
+                plugin.getLogger().warning("StartupManager: error while invoking onTransportConnectedAndAuthenticated: " + t.getMessage());
+            }
+        });
     }
 }
