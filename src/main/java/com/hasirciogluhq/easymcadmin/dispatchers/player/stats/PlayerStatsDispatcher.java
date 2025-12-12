@@ -18,10 +18,6 @@ public class PlayerStatsDispatcher implements PlayerStatsDispatcherInterface {
     @Override
     public void dispatch(String statsHash, String previousHash, Boolean fullSync, JsonObject event) {
         Packet packet = new PlayerStatsPacket(statsHash, fullSync, previousHash, event);
-        try {
-            plugin.getTransportManager().sendPacket(packet);
-        } catch (IOException e) {
-            plugin.getLogger().warning("Failed to send player stat event: " + e.getMessage());
-        }
+        plugin.getTransportManager().sendPacketAsync(packet);
     }
 }

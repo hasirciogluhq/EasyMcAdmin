@@ -9,6 +9,7 @@ import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 import com.google.gson.Gson;
 import com.hasirciogluhq.easymcadmin.EasyMcAdmin;
@@ -29,6 +30,14 @@ public class TcpTransport implements TransportInterface {
     private DataInputStream dataInputStream;
     private DataOutputStream dataOutputStream;
     private BlockingQueue<Packet> packetQueue;
+    // Outgoing queue and sender thread to avoid blocking caller threads on socket writes
+    private BlockingQueue<Packet> outgoingQueue;
+    private Thread senderThread;
+    private int outgoingQueueCapacity;
+    private long outgoingQueueOfferTimeoutMs;
+    // Telemetry
+    private static final java.util.concurrent.atomic.AtomicInteger enqueueFailures = new java.util.concurrent.atomic.AtomicInteger(0);
+    private static volatile TcpTransport INSTANCE = null;
     private Gson gson;
 
     public TcpTransport(EasyMcAdmin plugin, String host, int port) {
@@ -36,6 +45,20 @@ public class TcpTransport implements TransportInterface {
         this.host = host;
         this.port = port;
         this.packetQueue = new LinkedBlockingQueue<>();
+        // Read outgoing queue configuration from plugin config (fallback to defaults)
+        try {
+            this.outgoingQueueCapacity = Math.max(1, plugin.getConfig().getInt("transport.outgoing_queue_capacity", 5000));
+        } catch (Exception e) {
+            this.outgoingQueueCapacity = 5000;
+        }
+
+        try {
+            this.outgoingQueueOfferTimeoutMs = Math.max(0, plugin.getConfig().getInt("transport.outgoing_queue_offer_timeout_ms", 200));
+        } catch (Exception e) {
+            this.outgoingQueueOfferTimeoutMs = 200;
+        }
+
+        this.outgoingQueue = new LinkedBlockingQueue<>(this.outgoingQueueCapacity);
         this.gson = new Gson();
     }
 
@@ -137,6 +160,56 @@ public class TcpTransport implements TransportInterface {
             connectionThread.setName("EasyMcAdmin-TCP-Connection");
             connectionThread.setDaemon(true);
             connectionThread.start();
+
+            // register current instance for telemetry
+            INSTANCE = this;
+
+            // Start sender thread which consumes outgoingQueue and writes to socket
+            senderThread = new Thread(() -> {
+                while (isConnected && !Thread.currentThread().isInterrupted()) {
+                    try {
+                        Packet pkt = outgoingQueue.take(); // block until a packet is available
+                        if (pkt == null) continue;
+
+                        try {
+                            // Serialize packet to JSON
+                            String jsonString = gson.toJson(pkt.toJson());
+                            byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+                            synchronized (this) {
+                                if (dataOutputStream == null) {
+                                    throw new IOException("Output stream is null");
+                                }
+                                dataOutputStream.writeInt(jsonBytes.length);
+                                dataOutputStream.write(jsonBytes);
+                                dataOutputStream.flush();
+                            }
+                        } catch (IOException e) {
+                            // On write error, notify listener and break to trigger disconnect
+                            if (transportListener != null) {
+                                transportListener.onError(e);
+                            }
+                            isConnected = false;
+                            break;
+                        }
+
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    } catch (Exception e) {
+                        if (transportListener != null) {
+                            transportListener.onError(e);
+                        }
+                        isConnected = false;
+                        break;
+                    }
+                }
+
+                // Sender thread exiting
+            });
+            senderThread.setName("EasyMcAdmin-TCP-Sender");
+            senderThread.setDaemon(true);
+            senderThread.start();
         } catch (IOException e) {
             isConnected = false;
             if (transportListener != null) {
@@ -175,6 +248,16 @@ public class TcpTransport implements TransportInterface {
             if (socket != null && !socket.isClosed()) {
                 socket.close();
             }
+
+            // Stop sender thread
+            if (senderThread != null && senderThread.isAlive()) {
+                senderThread.interrupt();
+            }
+
+            // Clear outgoing queue to release memory
+            if (outgoingQueue != null) {
+                outgoingQueue.clear();
+            }
             
             if (wasConnected) {
                 wasConnected = false;
@@ -188,6 +271,8 @@ public class TcpTransport implements TransportInterface {
                 transportListener.onError(e);
             }
         }
+        // unregister telemetry instance
+        INSTANCE = null;
     }
 
     public boolean isConnected() {
@@ -201,23 +286,20 @@ public class TcpTransport implements TransportInterface {
             }
             return;
         }
-
+        // Enqueue the packet to outgoing queue for the dedicated sender thread to write.
         try {
-            // Serialize packet to JSON
-            String jsonString = gson.toJson(packet.toJson());
-            byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
-
-            // Write packet length (4 bytes - int)
-            dataOutputStream.writeInt(jsonBytes.length);
-
-            // Write packet data
-            dataOutputStream.write(jsonBytes);
-            dataOutputStream.flush();
-
-        } catch (IOException e) {
-            isConnected = false;
+            boolean offered = outgoingQueue.offer(packet, this.outgoingQueueOfferTimeoutMs, TimeUnit.MILLISECONDS);
+            if (!offered) {
+                // Queue full or unable to enqueue in timely manner
+                enqueueFailures.incrementAndGet();
+                if (transportListener != null) {
+                    transportListener.onError(new IOException("Outgoing queue full, cannot enqueue packet"));
+                }
+            }
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
             if (transportListener != null) {
-                transportListener.onError(e);
+                transportListener.onError(new IOException("Interrupted while enqueueing packet"));
             }
         } catch (Exception e) {
             if (transportListener != null) {
@@ -231,9 +313,25 @@ public class TcpTransport implements TransportInterface {
         if (wasConnected) {
             wasConnected = false;
         }
+        // Stop sender thread if running
+        if (senderThread != null && senderThread.isAlive()) {
+            senderThread.interrupt();
+        }
         if (transportListener != null) {
             transportListener.onDisconnect();
         }
+        // unregister telemetry instance
+        INSTANCE = null;
+    }
+
+    public static int getOutgoingQueueDepth() {
+        TcpTransport t = INSTANCE;
+        if (t == null || t.outgoingQueue == null) return 0;
+        return t.outgoingQueue.size();
+    }
+
+    public static int getEnqueueFailures() {
+        return enqueueFailures.get();
     }
 
     public void setTransportListener(TransportListener transportListener) {

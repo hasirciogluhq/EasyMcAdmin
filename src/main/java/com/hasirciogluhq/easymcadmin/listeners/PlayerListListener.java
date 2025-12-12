@@ -86,7 +86,7 @@ public class PlayerListListener implements Listener {
             playerObj.addProperty("online", false);
 
             Packet packet = new PlayerLeftPacket(playerObj);
-            plugin.getTransportManager().sendPacket(packet);
+            plugin.getTransportManager().sendPacketAsync(packet);
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to send player left event: " + e.getMessage());
         }

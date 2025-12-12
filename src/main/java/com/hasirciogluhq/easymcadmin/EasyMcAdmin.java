@@ -83,11 +83,7 @@ public class EasyMcAdmin extends JavaPlugin {
         metricsScheduler = new MetricsScheduler(this, new MetricsScheduler.TransportSender() {
             @Override
             public void sendPacket(Packet packet) {
-                try {
-                    transportManager.sendPacket(packet);
-                } catch (IOException e) {
-                    getLogger().warning("Failed to send packet to transport: " + e.getMessage());
-                }
+                transportManager.sendPacketAsync(packet);
             }
 
             @Override
@@ -150,6 +146,16 @@ public class EasyMcAdmin extends JavaPlugin {
             } catch (IOException e) {
                 getLogger().warning("Failed to disconnect from transport: " + e.getMessage());
             }
+        }
+
+        // Save any cached data before shutdown
+        try {
+            if (dataManager != null) {
+                dataManager.saveAll();
+                dataManager.stopAutoSave();
+            }
+        } catch (Exception e) {
+            getLogger().warning("Failed to save data on disable: " + e.getMessage());
         }
 
         // Remove console interceptor

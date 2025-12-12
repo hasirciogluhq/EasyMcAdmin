@@ -82,11 +82,7 @@ public class PlayerService {
                 // 2. If the packet will be sent, send it on an async thread
                 if (sendPacket) {
                     Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-                        try {
-                            plugin.getTransportManager().sendPacket(packet);
-                        } catch (Exception e) {
-                            plugin.getLogger().warning("Failed to send player inventory update: " + e.getMessage());
-                        }
+                        plugin.getTransportManager().sendPacketAsync(packet);
                     });
                 }
 
@@ -194,7 +190,7 @@ public class PlayerService {
                     try {
 
                         Packet packet = new PlayerDetailsUpdatePacket(playerObj);
-                        plugin.getTransportManager().sendPacket(packet);
+                        plugin.getTransportManager().sendPacketAsync(packet);
 
                         // Send balance updates separately
                         // sendPlayerBalanceUpdate(player);
@@ -266,7 +262,7 @@ public class PlayerService {
                     try {
                         // Send balance update packet
                         Packet packet = new PlayerEconomyUpdatedPacket(playerBalanceData);
-                        plugin.getTransportManager().sendPacket(packet);
+                        plugin.getTransportManager().sendPacketAsync(packet);
                     } catch (Exception e) {
                         plugin.getLogger().warning("Failed to send player balance update: " + e.getMessage());
                     }
@@ -335,12 +331,7 @@ public class PlayerService {
 
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             Packet packet = new PlayerJoinPacket(playerObj);
-            try {
-                plugin.getTransportManager().sendPacket(packet);
-            } catch (IOException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
+            plugin.getTransportManager().sendPacketAsync(packet);
         });
 
         // Send balance updates separately
@@ -393,16 +384,22 @@ public class PlayerService {
             // If the array doesn't exist in the file → create from scratch
             data.put("players", syncedUuids);
 
+            boolean playersListChanged = false;
+
             for (OfflinePlayer op : players) {
 
                 UUID uuid = op.getUniqueId();
 
-                // ❗ Sadece OFFLINE oyuncular takip edilecek
+                // If this offline player was already synced before, skip it.
+                if (!op.isOnline() && syncedUuids.contains(uuid.toString())) {
+                    continue;
+                }
+
+                // ❗ Sadece OFFLINE oyuncular takip edilecek (ve daha önce synclenmemiş olanlar)
                 if (!op.isOnline()) {
                     if (!syncedUuids.contains(uuid.toString())) {
                         syncedUuids.add(uuid.toString());
-                        // plugin.getDataManager().saveAsync("synced_user_offline_users.json"); //
-                        // Enable if desired
+                        playersListChanged = true;
                     }
                 }
 
@@ -417,6 +414,18 @@ public class PlayerService {
                 playerArray.add(json);
             }
 
+            // If we changed the players list, put it back into the data map so
+            // the AutoSavingMap will persist the update. (Mutating the List
+            // alone doesn't trigger map save.)
+            if (playersListChanged) {
+                data.put("players", syncedUuids);
+            }
+
+            // If there are no players to send in this chunk (all were already synced), skip sending.
+            if (playerArray.size() == 0) {
+                return;
+            }
+
             // Optional: send balances for online players
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 for (OfflinePlayer op : players) {
@@ -427,7 +436,7 @@ public class PlayerService {
             }, 1L);
 
             Packet packet = new OfflinePlayerChunkPacket(chunkIndex, totalChunks, isLastChunk, playerArray);
-            plugin.getTransportManager().sendPacket(packet);
+            plugin.getTransportManager().sendPacketAsync(packet);
 
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to send offline player chunk: " + e.getMessage());

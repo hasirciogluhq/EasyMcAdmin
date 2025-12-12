@@ -5,6 +5,7 @@ import org.bukkit.Bukkit;
 
 import java.lang.management.ManagementFactory;
 import java.util.*;
+import com.hasirciogluhq.easymcadmin.transport.tcp.TcpTransport;
 
 /**
  * Collects server metrics including player info, memory, CPU, and TPS
@@ -101,6 +102,13 @@ public class ServerMetricsCollector {
         data.put("minecraft_version", minecraftVersion);
         data.put("bukkit_version", bukkitVersion);
         data.put("timestamp", System.currentTimeMillis());
+
+        // Add transport telemetry if available
+        try {
+            data.put("transport_outgoing_queue_depth", TcpTransport.getOutgoingQueueDepth());
+            data.put("transport_enqueue_failures", TcpTransport.getEnqueueFailures());
+        } catch (Throwable ignored) {
+        }
 
         return data;
     }

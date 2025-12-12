@@ -40,7 +40,7 @@ public class ConsoleOutputHandler extends AbstractAppender {
                     "console",
                     detectType(message));
 
-            transportManager.sendPacket(packet);
+            transportManager.sendPacketAsync(packet);
 
         } catch (Throwable ignored) {
 

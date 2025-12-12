@@ -57,6 +57,32 @@ public class TransportManager {
         }
     }
 
+    /**
+     * Send a packet in a best-effort, non-throwing way. Implementations should
+     * enqueue/send without blocking the caller. Errors are logged via plugin
+     * logger or transport listener.
+     *
+     * @param packet Packet to send
+     */
+    public void sendPacketAsync(Packet packet) {
+        try {
+            transport.sendPacket(packet);
+        } catch (Exception e) {
+            try {
+                EasyMcAdmin.getInstance().getLogger().warning("Failed to send packet async: " + e.getMessage());
+            } catch (Exception ignored) {
+            }
+            // notify listener if present
+            try {
+                if (transport instanceof Object) {
+                    // no-op: just keep compatibility; transport implementations should
+                    // signal errors via TransportListener
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
     public void setTransportListener(TransportListener transportListener) {
         transport.setTransportListener(transportListener);
     }

@@ -1,41 +1,34 @@
-# Easy MC Admin Configuration
+# Easy MC Admin Configuration (cleaned)
 
-# Plugin Settings
+# General plugin settings
 settings:
-  # Enable/disable plugin features
-  enabled: true
-  
-  # Debug mode
+  # Debug logging (true = more verbose)
   debug: false
 
-# WebSocket Configuration
-websocket:
-  # WebSocket server URL (development: ws://localhost:8080/ws/plugin)
-  url: "ws://localhost:8080/ws/plugin"
-  
-  # Enable/disable WebSocket connection
+# Transport (TCP) settings used by the plugin transport implementation
+# Only fields read by the code are present here to avoid confusion.
+transport:
+  # Enable or disable transport connection attempts
   enabled: true
-  
-  # Auto-reconnect on disconnect
-  auto-reconnect: true
-  
-  # Reconnect delay in seconds
-  reconnect-delay: 5
-  
-  # Connection timeout in seconds
-  timeout: 10
+  # Host and port of the backend TCP transport
+  host: "localhost"
+  port: 8798
+  # Outgoing queue capacity for TCP transport (bounded). Increasing this
+  # allows more buffered outbound packets but uses more memory. Default: 5000
+  outgoing_queue_capacity: 5000
+  # Milliseconds to wait when enqueueing a packet before reporting queue full.
+  # 0 means do not wait. Default: 200
+  outgoing_queue_offer_timeout_ms: 200
 
-# Server Information
+# Server information
 server:
-  # Server identifier (auto-generated)
+  # Server identifier (auto-generated if empty)
   id: ""
-  
-  # Authentication token (set via /easymcadmin setToken <token>) 
+  # Authentication token (set via /easymcadmin setToken <token>)
   token: ""
-  
-  # Auto-sync server status
-  auto-sync: true
-  
-  # Sync interval in seconds
-  sync-interval: 30
+
+# Data manager settings
+data:
+  # Auto-save interval in seconds (minimum 5s). Default: 120 (2 minutes)
+  autosave_interval_seconds: 120
 

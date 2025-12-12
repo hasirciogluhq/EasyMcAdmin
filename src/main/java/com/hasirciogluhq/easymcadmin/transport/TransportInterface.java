@@ -9,6 +9,12 @@ public interface TransportInterface {
 
     boolean isConnected();
 
+    /**
+     * Enqueue a packet for sending. Implementations SHOULD avoid blocking the caller
+     * thread; writes may be performed asynchronously by a dedicated sender thread.
+     *
+     * @param packet Packet to send
+     */
     void sendPacket(Packet packet);
 
     void setTransportListener(TransportListener transportListener);

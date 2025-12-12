@@ -18,10 +18,6 @@ public class PlayerStatsEventDispatcher implements PlayerStatsEventDispatcherInt
     @Override
     public void dispatch(JsonObject event) {
         Packet packet = new PlayerStatsEventPacket(event);
-        try {
-            plugin.getTransportManager().sendPacket(packet);
-        } catch (IOException e) {
-            plugin.getLogger().warning("Failed to send player stat event: " + e.getMessage());
-        }
+        plugin.getTransportManager().sendPacketAsync(packet);
     }
 }
