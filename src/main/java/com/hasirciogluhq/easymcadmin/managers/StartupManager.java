@@ -76,8 +76,14 @@ public class StartupManager {
             try {
                 transportManager.connect();
                 plugin.getLogger().info("StartupManager: transport.connect() returned");
-                // connectionThread inside transport will call TransportHandler.onConnect,
-                // which in turn triggers authentication attempt; we'll also monitor auth state.
+                // Try auth immediately after connect (in addition to the periodic auth retry).
+                // This reduces the chance that waitForAuthThenSync() times out before any auth
+                // attempt is made.
+                try {
+                    attemptAuth();
+                } catch (Throwable ignored) {
+                }
+                // Continue to wait for auth and run initial sync when it becomes available.
                 waitForAuthThenSync();
                 connecting = false;
                 // reset backoff
